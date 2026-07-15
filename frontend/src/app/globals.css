@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL,GRAD,opsz@400,0,0,24&display=swap');
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --card: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --foreground: 222 47% 11%;
+    --card-foreground: 222 47% 11%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 262 83% 57.8%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215 16% 47%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 83% 57.8%;
+    --radius: 0.75rem;
+  }
+
+  body {
+    @apply min-h-screen bg-gray-50 font-sans text-gray-900 antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-gray-900 tracking-tight;
+  }
+}
+
+@layer components {
+  .card-surface {
+    @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+  }
+
+  .btn-primary {
+    @apply min-h-[44px] rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700;
+  }
+
+  .btn-secondary {
+    @apply min-h-[44px] rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-50;
+  }
+
+  .btn-ghost {
+    @apply min-h-[44px] rounded-lg px-4 py-2 font-medium text-gray-600 transition-colors hover:bg-gray-100;
+  }
+
+  .input-field {
+    @apply min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20;
+  }
+
+  .table-scroll {
+    @apply w-full overflow-x-auto;
+  }
+
+  .page-container {
+    @apply w-full p-4 md:p-6 lg:p-8;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-gray-900 md:text-3xl lg:text-4xl;
+  }
+
+  .page-subtitle {
+    @apply text-gray-500;
+  }
+
+  .section-gap {
+    @apply gap-6;
+  }
+}

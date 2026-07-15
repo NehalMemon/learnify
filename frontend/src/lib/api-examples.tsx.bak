@@ -1,0 +1,460 @@
+/**
+ * API Client Usage Examples
+ * 
+ * This file demonstrates how to use the API client in various scenarios.
+ * This is a reference file - do not import it in your components.
+ */
+
+// ═══════════════════════════════════════════════════════════════
+// Example 1: Login Form Component
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { authApi } from '@/lib/api';
+
+function LoginForm() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await authApi.login({ email, password });
+      if (response.success) {
+        // Tokens are automatically saved by authApi.login()
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* form fields */}
+    </form>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 2: Using the useAuth Hook
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useAuth } from '@/hooks';
+
+function Dashboard() {
+  const { user, loading, isAuthenticated, logout } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <div>Please log in</div>;
+  }
+
+  return (
+    <div>
+      <h1>Welcome, {user?.fullName}!</h1>
+      <button onClick={logout}>Logout</button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 3: Fetching Courses with useCourses Hook
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useCourses } from '@/hooks';
+
+function CourseList() {
+  const { data: courses, loading, error, refetch } = useCourses({
+    division: 'meded',
+    page: 1,
+    limit: 20,
+  });
+
+  if (loading) return <div>Loading courses...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  return (
+    <div>
+      {courses?.map((course) => (
+        <div key={course.id}>
+          <h2>{course.title}</h2>
+          <p>{course.description}</p>
+        </div>
+      ))}
+      <button onClick={refetch}>Refresh</button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 4: Course Content with Progress
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import { coursesApi, progressApi } from '@/lib/api';
+
+function CourseContent({ courseId }: { courseId: string }) {
+  const [content, setContent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchContent() {
+      try {
+        // Get full course content tree with progress
+        const response = await coursesApi.getCourseContent(courseId);
+        setContent(response.data.data);
+      } catch (error) {
+        console.error('Failed to fetch content:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchContent();
+  }, [courseId]);
+
+  const handleCompleteMaterial = async (materialId: string) => {
+    try {
+      await progressApi.completeMaterial(materialId);
+      // Refresh content to show updated progress
+      const response = await coursesApi.getCourseContent(courseId);
+      setContent(response.data.data);
+    } catch (error) {
+      console.error('Failed to complete material:', error);
+    }
+  };
+
+  if (loading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      {content?.modules?.map((module: any) => (
+        <div key={module.id}>
+          <h3>{module.title}</h3>
+          {module.materials.map((material: any) => (
+            <div key={material.id}>
+              <span>{material.title}</span>
+              {!material.progress?.isCompleted && (
+                <button onClick={() => handleCompleteMaterial(material.id)}>
+                  Mark Complete
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 5: Quiz with Real-Time Events
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import Pusher from 'pusher-js';
+import { quizApi } from '@/lib/api';
+
+function QuizSession({ attemptId }: { attemptId: string }) {
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+
+  useEffect(() => {
+    // Subscribe to quiz channel for real-time events
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: 'ap2',
+    });
+
+    const channel = pusher.subscribe(`private-quiz-${attemptId}`);
+
+    channel.bind('quiz-started', (data: { startTime: string; durationSec: number }) => {
+      const endTime = new Date(data.startTime).getTime() + data.durationSec * 1000;
+      
+      const timer = setInterval(() => {
+        const now = Date.now();
+        const remaining = Math.max(0, endTime - now);
+        setTimeRemaining(remaining);
+
+        if (remaining === 0) {
+          clearInterval(timer);
+          // Auto-submit quiz
+        }
+      }, 1000);
+
+      return () => clearInterval(timer);
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
+    };
+  }, [attemptId]);
+
+  const submitAnswer = async (questionId: string, selected: 'A' | 'B' | 'C' | 'D') => {
+    await quizApi.submitAnswer(attemptId, { questionId, selected });
+  };
+
+  const finalizeQuiz = async () => {
+    await quizApi.finalizeQuiz(attemptId);
+  };
+
+  return (
+    <div>
+      <div>Time remaining: {Math.floor(timeRemaining / 1000)}s</div>
+      {/* Quiz questions */}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 6: Admin - Create Course with Validation
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useState } from 'react';
+import { adminApi } from '@/lib/api';
+import { requireAdmin } from '@/lib/auth';
+
+function CreateCourseForm() {
+  const [formData, setFormData] = useState({
+    divisionId: '',
+    title: '',
+    courseType: 'FULL_COURSE',
+    category: '',
+    instructor: '',
+    price: 0,
+    description: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Check admin access
+  if (!requireAdmin('/')) {
+    return null;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      await adminApi.createCourse(formData);
+      // Success - redirect or show message
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to create course');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* form fields */}
+    </form>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 7: File Upload - Material Creation
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useState, useRef } from 'react';
+import { adminApi } from '@/lib/api';
+
+function CreateMaterialForm({ moduleId }: { moduleId: string }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    materialType: 'VIDEO',
+    sequence: 0,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    const formDataToSend = new FormData();
+    formDataToSend.append('title', formData.title);
+    formDataToSend.append('materialType', formData.materialType);
+    formDataToSend.append('sequence', formData.sequence.toString());
+    
+    if (fileInputRef.current?.files?.[0]) {
+      formDataToSend.append('file', fileInputRef.current.files[0]);
+    }
+
+    try {
+      await adminApi.createMaterial(moduleId, formDataToSend);
+      // Success
+    } catch (err: any) {
+      console.error('Upload failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="video/*,image/*,application/pdf"
+      />
+      {/* other fields */}
+    </form>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 8: Protected Route in Next.js App Router
+// ═══════════════════════════════════════════════════════════════
+
+// app/dashboard/page.tsx
+import { redirect } from 'next/navigation';
+import { getTokens, getUser } from '@/lib/api';
+
+export default function DashboardPage() {
+  // Server-side auth check
+  const tokens = getTokens(); // Note: This won't work in server components
+  // You'll need to use cookies or pass tokens from client
+
+  if (!tokens) {
+    redirect('/login');
+  }
+
+  return <div>Dashboard content</div>;
+}
+
+// Better approach: Check auth in client component
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks';
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, loading, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <div>Dashboard content</div>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 9: Manual API Call with Axios Instance
+// ═══════════════════════════════════════════════════════════════
+
+import apiClient from '@/lib/api';
+
+async function customApiCall() {
+  try {
+    // The interceptor automatically adds the Bearer token
+    const response = await apiClient.get('/custom-endpoint');
+    return response.data;
+  } catch (error) {
+    // 401 errors are automatically handled with token refresh
+    console.error('API call failed:', error);
+    throw error;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Example 10: Leaderboard with Real-Time Updates
+// ═══════════════════════════════════════════════════════════════
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import Pusher from 'pusher-js';
+import { quizApi } from '@/lib/api';
+import type { LeaderboardEntry } from '@/types';
+
+function Leaderboard() {
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await quizApi.getLeaderboard({ limit: 20 });
+      setLeaderboard(response.data.data);
+    } catch (error) {
+      console.error('Failed to fetch leaderboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeaderboard();
+
+    // Subscribe to leaderboard updates
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
+      cluster: 'ap2',
+    });
+
+    const channel = pusher.subscribe('public-leaderboard');
+
+    channel.bind('leaderboard-updated', () => {
+      // Silently refresh leaderboard
+      fetchLeaderboard();
+    });
+
+    return () => {
+      channel.unbind_all();
+      channel.unsubscribe();
+      pusher.disconnect();
+    };
+  }, []);
+
+  if (loading) return <div>Loading leaderboard...</div>;
+
+  return (
+    <div>
+      {leaderboard.map((entry, index) => (
+        <div key={entry.rank}>
+          {index + 1}. {entry.fullName} - {entry.score}/{entry.totalQs} ({entry.percentage}%)
+        </div>
+      ))}
+    </div>
+  );
+}

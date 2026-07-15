@@ -1,0 +1,514 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // url is configured in prisma.config.ts (Prisma v7 requirement)
+}
+
+// ─── User & Auth ────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  TRUE_FALSE
+  MULTIPLE_SELECT
+  MATCHING_PAIRS
+}
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  passwordHash          String    @map("password_hash")
+  role                  Role      @default(STUDENT)
+  fullName              String    @map("full_name")
+  phone                 String?
+  hasSeenQuizDisclaimer Boolean   @default(false) @map("has_seen_quiz_disclaimer")
+  universityProgram     String?   @map("university_program")
+  studyYear             Int?      @map("study_year")
+  learnifyEnabled       Boolean   @default(true) @map("learnify_enabled")
+  doctorsQuizzEnabled   Boolean   @default(false) @map("doctors_quizz_enabled")
+  isDeleted             Boolean   @default(false) @map("is_deleted")
+  deletedAt             DateTime? @map("deleted_at")
+  accessExpiresAt       DateTime? @map("access_expires_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  enrollments   Enrollment[]
+  quizAttempts  QuizAttempt[]
+  favorites     Favorite[]
+  workshopRegs  WorkshopRegistration[]
+  notifications Notification[]
+  systemLogs    SystemLog[]
+
+  @@index([isDeleted])
+  @@index([role])
+  @@index([role, isDeleted])
+  @@index([accessExpiresAt])
+  @@index([createdAt(sort: Desc)])
+  @@map("users")
+}
+
+// ─── Platform Divisions ─────────────────────────────────────
+
+enum DivisionSlug {
+  FOUNDATION
+  MEDED
+}
+
+model Division {
+  id   String       @id @default(uuid())
+  name String // "Learnify Foundation" or "Learnify MedEd"
+  slug DivisionSlug @unique
+
+  courses   Course[]
+  workshops Workshop[]
+
+  @@map("divisions")
+}
+
+// ─── Course Catalogue ───────────────────────────────────────
+
+enum CourseType {
+  FULL_COURSE
+  CRASH_COURSE
+  TEST_SERIES
+  REVISION
+  NOTES_ONLY
+  QUIZ_ACCESS
+}
+
+model Course {
+  id           String     @id @default(uuid())
+  divisionId   String     @map("division_id")
+  title        String
+  description  String?
+  courseType   CourseType @map("course_type")
+  category     String? // e.g. "O Level", "Anatomy"
+  instructor   String?
+  price        Decimal    @default(0) @db.Decimal(10, 2)
+  classroomUrl String?    @map("classroom_url")
+  isPublished  Boolean    @default(false) @map("is_published")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  division      Division       @relation(fields: [divisionId], references: [id], onDelete: Restrict)
+  modules       Module[]
+  enrollments   Enrollment[]
+  classSessions ClassSession[]
+
+  @@index([divisionId])
+  @@index([courseType])
+  @@index([category])
+  @@index([isPublished, createdAt(sort: Desc)])
+  @@index([divisionId, isPublished, createdAt(sort: Desc)])
+  @@map("courses")
+}
+
+// ─── Class Session Scheduling ────────────────────────────────
+// Stores per-session meeting links (replaces single scalar on Course).
+
+model ClassSession {
+  id          String   @id @default(uuid())
+  courseId    String   @map("course_id")
+  title       String?
+  scheduledAt DateTime @map("scheduled_at")
+  meetingLink String   @map("meeting_link")
+  platform    String? // "Zoom" or "Google Meet"
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+  @@index([courseId, scheduledAt(sort: Desc)])
+  @@map("class_sessions")
+}
+
+// ─── Modules & Materials (Progress Unlock) ──────────────────
+
+model Module {
+  id               String  @id @default(uuid())
+  courseId         String  @map("course_id")
+  title            String
+  sequence         Int
+  requiredModuleId String? @map("required_module_id")
+
+  course         Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  requiredModule Module?          @relation("ModuleDependency", fields: [requiredModuleId], references: [id], onDelete: SetNull)
+  dependents     Module[]         @relation("ModuleDependency")
+  materials      Material[]
+  moduleProgress ModuleProgress[]
+
+  @@unique([courseId, sequence])
+  @@index([courseId])
+  @@index([requiredModuleId])
+  @@index([courseId, requiredModuleId])
+  @@map("modules")
+}
+
+enum MaterialType {
+  NOTE
+  VIDEO
+  QUIZ
+}
+
+model Material {
+  id             String       @id @default(uuid())
+  moduleId       String       @map("module_id")
+  title          String
+  materialType   MaterialType @map("material_type")
+  objectUrl      String?      @map("object_url") // S3 path
+  thumbnailUrl   String?      @map("thumbnail_url") // S3 thumbnail for videos
+  durationSec    Int?         @map("duration_sec") // video/audio duration in seconds
+  secureViewOnly Boolean      @default(true) @map("secure_view_only")
+  sequence       Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  module           Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  materialProgress MaterialProgress[]
+
+  @@index([moduleId])
+  @@index([moduleId, sequence])
+  @@index([moduleId, materialType, sequence])
+  @@map("materials")
+}
+
+// ─── Enrollment & Access Control ────────────────────────────
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+model Enrollment {
+  id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  courseId        String           @map("course_id")
+  status          EnrollmentStatus @default(ACTIVE)
+  progressPercent Int              @default(0) @map("progress_percent")
+  enrolledAt      DateTime         @default(now()) @map("enrolled_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course           Course             @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  payments         Payment[]
+  materialProgress MaterialProgress[]
+  moduleProgress   ModuleProgress[]
+  gradeSheets      GradeSheet[]
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([status])
+  @@index([userId, enrolledAt(sort: Desc)])
+  @@index([courseId, enrolledAt(sort: Desc)])
+  @@index([userId, status, enrolledAt(sort: Desc)])
+  @@map("enrollments")
+}
+
+// ─── Grade Sheets ─────────────────────────────────────────────
+// Admin uploads PDF grade sheets linked to a specific enrollment.
+
+model GradeSheet {
+  id           String   @id @default(uuid())
+  enrollmentId String   @map("enrollment_id")
+  title        String
+  s3Url        String   @map("s3_url")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId])
+  @@index([enrollmentId, uploadedAt(sort: Desc)])
+  @@map("grade_sheets")
+}
+
+// ─── Payment Tracking ───────────────────────────────────────
+
+enum PaymentType {
+  LUMP_SUM
+  MONTHLY
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  OVERDUE
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  enrollmentId  String        @map("enrollment_id")
+  paymentType   PaymentType   @map("payment_type")
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(PENDING)
+  dueDate       DateTime?     @map("due_date")
+  proofImageUrl String?       @map("proof_image_url")
+  verifiedAt    DateTime?     @map("verified_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, paymentType, dueDate])
+  @@index([enrollmentId])
+  @@index([status])
+  @@index([paymentType])
+  @@index([enrollmentId, status, createdAt(sort: Desc)])
+  @@index([enrollmentId, dueDate])
+  @@index([status, dueDate])
+  @@map("payments")
+}
+
+// ─── Material Progress ──────────────────────────────────────
+
+model MaterialProgress {
+  id           String    @id @default(uuid())
+  enrollmentId String    @map("enrollment_id")
+  materialId   String    @map("material_id")
+  isCompleted  Boolean   @default(false) @map("is_completed")
+  completedAt  DateTime? @map("completed_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  material   Material   @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, materialId])
+  @@index([enrollmentId])
+  @@index([materialId])
+  @@index([enrollmentId, isCompleted])
+  @@index([materialId, isCompleted])
+  @@map("material_progress")
+}
+
+// ─── DoctorsQuizz ───────────────────────────────────────────
+
+model QuizCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique // Anatomy, Physiology, etc.
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt
+
+  quizzes Quiz[]
+
+  @@map("quiz_categories")
+}
+
+// ─── Quiz (Named Exam Wrapper) ───────────────────────────────
+// Groups questions into a distinct, publishable exam within a category.
+// e.g. "Anatomy Midterm 1" (categoryId → Anatomy).
+// Questions and Attempts relate to Quiz, which relates to QuizCategory (3NF).
+
+model Quiz {
+  id          String   @id @default(uuid())
+  categoryId  String   @map("category_id")
+  title       String
+  subject     String?
+  year        Int      @default(1)
+  durationSec Int      @default(3600) @map("duration_sec") // Exam time limit in seconds; default = 1 hour
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category  QuizCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([categoryId])
+  @@index([categoryId, isPublished, createdAt(sort: Desc)])
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id            String       @id @default(uuid())
+  quizId        String       @map("quiz_id")
+  type          QuestionType @default(SINGLE_CHOICE)
+  questionText  String       @map("question_text")
+  content       Json         @default("{}") @map("content")
+  correctAnswer Json         @default("{}") @map("correct_answer")
+  points        Int          @default(1)
+  optionA       String?      @map("option_a")
+  optionB       String?      @map("option_b")
+  optionC       String?      @map("option_c")
+  optionD       String?      @map("option_d")
+  correctOption String?      @map("correct_option") // Legacy "A","B","C","D"
+  explanation   String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers QuizAnswer[]
+
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  quizId       String    @map("quiz_id")
+  score        Int       @default(0)
+  totalQs      Int       @map("total_qs")
+  timeTakenSec Int?      @map("time_taken_sec")
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz    Quiz         @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  answers QuizAnswer[]
+
+  @@index([userId])
+  @@index([quizId])
+  @@index([finishedAt])
+  @@index([userId, startedAt(sort: Desc)])
+  @@index([quizId, finishedAt(sort: Desc)])
+  @@map("quiz_attempts")
+}
+
+model QuizAnswer {
+  id         String  @id @default(uuid())
+  attemptId  String  @map("attempt_id")
+  questionId String  @map("question_id")
+  selected   String // "A","B","C","D"
+  isCorrect  Boolean @map("is_correct")
+
+  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+  @@map("quiz_answers")
+}
+
+// ─── Workshops ──────────────────────────────────────────────
+
+model Workshop {
+  id           String   @id @default(uuid())
+  divisionId   String   @map("division_id")
+  title        String
+  instructor   String?
+  description  String?
+  date         DateTime
+  platform     String? // "Zoom" or "Google Meet"
+  meetingLink  String?  @map("meeting_link")
+  price        Decimal  @default(0) @db.Decimal(10, 2)
+  recordingUrl String?  @map("recording_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  division      Division               @relation(fields: [divisionId], references: [id], onDelete: Restrict)
+  registrations WorkshopRegistration[]
+
+  @@index([divisionId])
+  @@index([divisionId, date(sort: Desc)])
+  @@index([date(sort: Desc)])
+  @@map("workshops")
+}
+
+model WorkshopRegistration {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  workshopId   String   @map("workshop_id")
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workshopId])
+  @@index([userId])
+  @@index([workshopId])
+  @@index([userId, registeredAt(sort: Desc)])
+  @@index([workshopId, registeredAt(sort: Desc)])
+  @@map("workshop_registrations")
+}
+
+// ─── Module Progress (Sequential Unlocking) ──────────────────
+// Tracks per-enrollment unlock and completion state for each module.
+// Created by the BullMQ progress worker when a material is completed.
+
+model ModuleProgress {
+  id           String    @id @default(uuid())
+  enrollmentId String    @map("enrollment_id")
+  moduleId     String    @map("module_id")
+  isUnlocked   Boolean   @default(false) @map("is_unlocked")
+  isCompleted  Boolean   @default(false) @map("is_completed")
+  completedAt  DateTime? @map("completed_at")
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  module     Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, moduleId])
+  @@index([enrollmentId])
+  @@index([moduleId])
+  @@index([enrollmentId, isUnlocked, moduleId])
+  @@index([enrollmentId, isCompleted, moduleId])
+  @@map("module_progress")
+}
+
+// ─── Favorites (User bookmarks for Courses/Quizzes) ─────────
+
+enum FavoriteItemType {
+  COURSE
+  QUIZ
+}
+
+model Favorite {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  itemId    String           @map("item_id")
+  itemType  FavoriteItemType @map("item_type")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId, itemType])
+  @@index([userId])
+  @@map("favorites")
+}
+
+// ─── Notifications ──────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String   @db.Text
+  link      String? // Optional URL to redirect to when clicked
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+// ─── System Audit Logs ──────────────────────────────────────
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     LogLevel @default(INFO)
+  action    String // e.g. "USER_REGISTERED", "QUIZ_DELETED", "PAYMENT_VERIFIED"
+  message   String   @db.Text
+  metadata  Json? // optional structured payload (request body, error stack, etc.)
+  userId    String?  @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([level])
+  @@index([action])
+  @@index([userId])
+  @@index([level, createdAt(sort: Desc)])
+  @@map("system_logs")
+}
