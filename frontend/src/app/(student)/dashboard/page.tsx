@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { coursesApi, enrollmentsApi, quizApi } from '@/lib/api'
 import { useAuthContext } from '@/components/providers/AuthProvider'
+import { createClient } from '@/utils/supabase/client'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
 
@@ -218,6 +219,42 @@ export default function StudentDashboardPage() {
     quizzes: [],
   })
   const [loading, setLoading] = useState(true)
+  const [displayName, setDisplayName] = useState<string>('Student')
+
+  // Resolve the user's display name from the best available source
+  useEffect(() => {
+    if (user?.fullName) {
+      setDisplayName(user.fullName)
+      return
+    }
+    const resolveDisplayName = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user: sbUser } } = await supabase.auth.getUser()
+        const name =
+          sbUser?.user_metadata?.full_name ??
+          sbUser?.user_metadata?.name ??
+          null
+        if (name) {
+          setDisplayName(name)
+          return
+        }
+        if (sbUser?.id) {
+          const { data } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', sbUser.id)
+            .single()
+          if (data?.full_name) {
+            setDisplayName(data.full_name)
+          }
+        }
+      } catch {
+        // Fallback to 'Student' on any error
+      }
+    }
+    resolveDisplayName()
+  }, [user])
 
   useEffect(() => {
     const alertValue = new URLSearchParams(window.location.search).get('alert')
@@ -398,7 +435,7 @@ export default function StudentDashboardPage() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-purple-600">Learning hub</p>
           <h1 className="page-title mt-1">
-            Welcome back, {user?.fullName || 'Student'}
+            Welcome back, {displayName}
           </h1>
           <p className="page-subtitle mt-2 text-sm">
             Resume your current work, jump into practice, or pick the next recommended module.
@@ -408,11 +445,11 @@ export default function StudentDashboardPage() {
         <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
           <Avatar className="h-11 w-11">
             <AvatarFallback className="bg-blue-100 font-bold text-blue-700">
-              {user?.fullName?.slice(0, 2).toUpperCase() ?? 'ST'}
+              {displayName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-bold text-slate-950">{user?.fullName || 'Student'}</p>
+            <p className="text-sm font-bold text-slate-950">{displayName}</p>
             <p className="text-xs text-slate-500">{user?.email ?? 'Ready to learn'}</p>
           </div>
         </div>

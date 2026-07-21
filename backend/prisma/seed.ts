@@ -21,7 +21,7 @@ function createPrismaClient() {
   });
 
   const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter, datasourceUrl: process.env.DATABASE_URL });
 }
 
 async function main() {

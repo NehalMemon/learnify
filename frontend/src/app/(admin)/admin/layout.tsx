@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       } catch (err) {
         const status = (err as AxiosError)?.response?.status;
 
-        if (status === 401 || status === 403) {
+        if (status === 401 || status === 403 || status === 400) {
           /**
            * Explicit auth rejection: the token is invalid or expired.
            * The Axios interceptor in api.ts will attempt a refresh first,

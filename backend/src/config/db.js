@@ -25,6 +25,7 @@ function createPrismaClient() {
 
   return new PrismaClient({
     adapter,
+    datasourceUrl: process.env.DATABASE_URL,
     log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['warn', 'error'],
   });
 }

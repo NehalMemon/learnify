@@ -21,7 +21,7 @@ async function main() {
 
   const pool    = new Pool({ connectionString: process.env.DATABASE_URL });
   const adapter = new PrismaPg(pool);
-  const prisma  = new PrismaClient({ adapter });
+  const prisma  = new PrismaClient({ adapter, datasourceUrl: process.env.DATABASE_URL });
 
   try {
     const salt         = await bcrypt.genSalt(12);

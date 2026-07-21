@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Header, Footer, Container, Sidebar, AuthGuard } from '@/components/layout';
+import { Header, Footer, Container, Sidebar } from '@/components/layout';
 import { adminApi } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -64,8 +64,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <AuthGuard requireAdmin>
-      <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50">
         <Header />
         <div className="flex flex-grow">
           <Sidebar variant="admin" />
@@ -376,6 +375,5 @@ export default function AdminDashboardPage() {
         </div>
         <Footer />
       </div>
-    </AuthGuard>
   );
 }

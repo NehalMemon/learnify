@@ -15,6 +15,12 @@ export async function loginWithEmail(formData: FormData) {
 
   const supabase = await createClient()
 
+  // TODO: Remove after ECONNRESET debugging is complete
+  console.log('--- AUTH DEBUG ---');
+  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('Attempting login for:', email);
+  console.log('------------------');
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,

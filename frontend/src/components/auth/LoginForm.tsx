@@ -7,12 +7,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import { loginSchema, type LoginFormValues } from '@/lib/validations/auth';
-import { createClient } from '@/utils/supabase/client';
+// import { createClient } from '@/utils/supabase/client'; // removed unused import
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordInput } from '@/components/auth/PasswordInput';
 import { loginWithEmail, signInWithGoogle } from '@/app/actions/authActions';
-import { authApi } from '@/lib/api';
+
 
 const getSafeRedirect = (value: string | null, fallback = '/dashboard') => {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
@@ -53,35 +53,27 @@ function LoginFormContent() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setServerError('');
+    setIsGoogleLoading(true);
 
     const formData = new FormData();
     formData.append('email', values.email);
     formData.append('password', values.password);
-
-    try {
-      await authApi.login({ email: values.email, password: values.password });
-    } catch (err) {
-      setServerError('Failed to authenticate with backend server.');
-      return;
-    }
 
     let result;
     try {
       result = await loginWithEmail(formData);
     } catch {
       setServerError('Login failed — could not reach the authentication server. Please try again.');
+      setIsGoogleLoading(false);
       return;
     }
 
     if (result?.error) {
       setServerError(result.error);
+      setIsGoogleLoading(false);
       return;
     }
 
-    // Why: loginWithEmail returns { redirectTo } instead of calling redirect()
-    // because server action redirect() throws when called via await. We use
-    // getPostLoginRedirect to reconcile the Supabase role with any ?redirect=
-    // query param, then navigate on the client.
     if (result?.redirectTo) {
       const role = result.redirectTo.startsWith('/admin') ? 'ADMIN' : 'STUDENT';
       const destination = getPostLoginRedirect(role as 'STUDENT' | 'ADMIN', redirect);

@@ -96,71 +96,77 @@ export default function AdminDashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
+    // Initialize fallback data
+    let statsData: Record<string, any> = {};
+    let users: AdminUser[] = [];
+    let courses: AdminCourse[] = [];
+    let totalCourses = 0;
+    let quizzes: { id: string; title: string }[] = [];
+    let recentAttempts: any[] = [];
+
+    // Fetch stats
     try {
-      const [statsRes, usersRes, coursesRes, quizzesRes, attemptsRes] = await Promise.allSettled([
-        adminApi.getStats(),
-        adminApi.listUsers({ limit: 5 }),
-        adminApi.listCourses({ limit: 5 }),
-        adminApi.listQuizzes(),
-        apiClient.get('/quiz/attempts/my', { params: { limit: 5 } }),
-      ]);
-
-      const statsData =
-        statsRes.status === 'fulfilled' ? (statsRes.value.data?.data ?? {}) : {};
-      const users: AdminUser[] =
-        usersRes.status === 'fulfilled' ? (usersRes.value.data?.data?.users ?? []) : [];
-      const courses: AdminCourse[] =
-        coursesRes.status === 'fulfilled' ? (coursesRes.value.data?.data?.courses ?? []) : [];
-      const totalCourses: number =
-        coursesRes.status === 'fulfilled'
-          ? (coursesRes.value.data?.data?.pagination?.total ?? courses.length)
-          : courses.length;
-
-      const quizzes =
-        quizzesRes.status === 'fulfilled' && Array.isArray(quizzesRes.value.data?.data)
-          ? quizzesRes.value.data.data
-          : [];
-
-      const quizTitleById = new Map<string, string>(
-        quizzes.map((quiz: { id: string; title: string }) => [quiz.id, quiz.title])
-      );
-
-      const recentAttempts =
-        attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value.data?.data?.attempts)
-          ? attemptsRes.value.data.data.attempts
-          : [];
-
-      const activity: ActivityItem[] = recentAttempts.map(
-        (attempt: { id: string; quizId?: string; startedAt: string; user?: { fullName?: string } }) => ({
-          id: attempt.id,
-          userName: attempt.user?.fullName || 'Learner',
-          quizTitle: attempt.quizId ? quizTitleById.get(attempt.quizId) ?? 'an exam' : 'an exam',
-          startedAt: attempt.startedAt,
-        })
-      );
-
-      if (!activity.length) {
-        for (const user of users) {
-          activity.push({
-            id: user.id,
-            userName: user.fullName || user.email,
-            quizTitle: 'the platform',
-            startedAt: new Date().toISOString(),
-          });
-        }
-      }
-
-      setState({
-        activity,
-        courses,
-        totalStudents: Number(statsData.totalStudents ?? users.length),
-        totalQuizzes: Number(statsData.totalQuizzes ?? quizzes.length),
-        activeAttempts: Number(statsData.activeAttempts ?? 0),
-        totalCourses,
-        isLoading: false,
-        error: null,
-      });
+      const statsRes = await adminApi.getStats();
+      statsData = statsRes.data?.data ?? {};
     } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    }
+
+    // Fetch recent users
+    try {
+      const usersRes = await adminApi.listUsers({ limit: 5 });
+      users = usersRes.data?.data?.users ?? [];
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+    }
+
+    // Fetch courses
+    try {
+      const coursesRes = await adminApi.listCourses({ limit: 5 });
+      courses = coursesRes.data?.data?.courses ?? [];
+      totalCourses = coursesRes.data?.data?.pagination?.total ?? courses.length;
+    } catch (err) {
+      console.error('Failed to fetch courses:', err);
+    }
+
+    // Fetch quizzes
+    try {
+      const quizzesRes = await adminApi.listQuizzes();
+      quizzes = Array.isArray(quizzesRes.data?.data) ? quizzesRes.data?.data : [];
+    } catch (err) {
+      console.error('Failed to fetch quizzes:', err);
+    }
+
+    // Fetch recent attempts
+    try {
+      const attemptsRes = await apiClient.get('/quiz/attempts/my', { params: { limit: 5 } });
+      recentAttempts = attemptsRes.data?.data?.attempts ?? [];
+    } catch (err) {
+      console.error('Failed to fetch attempts:', err);
+    }
+
+    // Build activity list
+    const quizTitleById = new Map<string, string>(
+      quizzes.map((quiz) => [quiz.id, quiz.title])
+    );
+
+    const activity: ActivityItem[] = recentAttempts.map((attempt) => ({
+      id: attempt.id,
+      userName: attempt.user?.fullName || 'Learner',
+      quizTitle: attempt.quizId ? quizTitleById.get(attempt.quizId) ?? 'an exam' : 'an exam',
+      startedAt: attempt.startedAt,
+    }));
+
+    // If no recent attempts, synthesize placeholder activity from users
+    if (!activity.length) {
+      for (const user of users) {
+        activity.push({
+          id: user.id,
+          userName: user.fullName || user.email,
+          quizTitle: 'the platform',
+          startedAt: new Date().toISOString(),
+        });
+      }
       const axiosErr = err as AxiosError<{ message?: string }>;
       setState((prev) => ({
         ...prev,
