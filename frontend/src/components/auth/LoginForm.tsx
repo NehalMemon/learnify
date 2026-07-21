@@ -65,7 +65,13 @@ function LoginFormContent() {
       return;
     }
 
-    const result = await loginWithEmail(formData);
+    let result;
+    try {
+      result = await loginWithEmail(formData);
+    } catch {
+      setServerError('Login failed — could not reach the authentication server. Please try again.');
+      return;
+    }
 
     if (result?.error) {
       setServerError(result.error);
