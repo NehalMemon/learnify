@@ -2,17 +2,17 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
-import { AxiosError } from 'axios';
 import { Loader2 } from 'lucide-react';
-import { authApi } from '@/lib/api';
 import { loginSchema, type LoginFormValues } from '@/lib/validations/auth';
+import { createClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { PasswordInput } from '@/components/auth/PasswordInput';
+import { loginWithEmail, signInWithGoogle } from '@/app/actions/authActions';
+import { authApi } from '@/lib/api';
 
 const getSafeRedirect = (value: string | null, fallback = '/dashboard') => {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
@@ -32,6 +32,7 @@ const getPostLoginRedirect = (role: 'STUDENT' | 'ADMIN', requestedRedirect: stri
 
 function LoginFormContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const redirect = getSafeRedirect(searchParams.get('redirect'));
 
   const [serverError, setServerError] = useState('');
@@ -53,36 +54,33 @@ function LoginFormContent() {
   const onSubmit = async (values: LoginFormValues) => {
     setServerError('');
 
-    try {
-      const response = await authApi.login(values);
-      window.location.assign(getPostLoginRedirect(response.user.role, redirect));
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setServerError(axiosErr.response?.data?.message || 'Login failed. Please try again.');
-    }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    setIsGoogleLoading(true);
-    setServerError('');
+    const formData = new FormData();
+    formData.append('email', values.email);
+    formData.append('password', values.password);
 
     try {
-      if (!credentialResponse.credential) {
-        throw new Error('No credential received from Google');
-      }
-
-      const response = await authApi.googleLogin(credentialResponse.credential);
-      window.location.assign(getPostLoginRedirect(response.user.role, redirect));
+      await authApi.login({ email: values.email, password: values.password });
     } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setServerError(axiosErr.response?.data?.message || 'Google sign-in failed. Please try again.');
-      setIsGoogleLoading(false);
+      setServerError('Failed to authenticate with backend server.');
+      return;
     }
-  };
 
-  const handleGoogleError = () => {
-    setServerError('Google sign-in failed. Please try again.');
-    setIsGoogleLoading(false);
+    const result = await loginWithEmail(formData);
+
+    if (result?.error) {
+      setServerError(result.error);
+      return;
+    }
+
+    // Why: loginWithEmail returns { redirectTo } instead of calling redirect()
+    // because server action redirect() throws when called via await. We use
+    // getPostLoginRedirect to reconcile the Supabase role with any ?redirect=
+    // query param, then navigate on the client.
+    if (result?.redirectTo) {
+      const role = result.redirectTo.startsWith('/admin') ? 'ADMIN' : 'STUDENT';
+      const destination = getPostLoginRedirect(role as 'STUDENT' | 'ADMIN', redirect);
+      router.replace(destination);
+    }
   };
 
   return (
@@ -158,23 +156,17 @@ function LoginFormContent() {
         </div>
 
         <div className="mt-6 flex justify-center">
-          {isGoogleLoading ? (
-            <div className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-2.5 shadow-sm">
-              <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
-              <span className="text-sm font-medium text-gray-700">Signing in...</span>
-            </div>
-          ) : (
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-              useOneTap={false}
-              text="signin_with"
-              shape="rectangular"
-              size="large"
-              theme="outline"
-              width="384"
-            />
-          )}
+          <form action={signInWithGoogle} className="w-full max-w-sm">
+            <Button type="submit" variant="outline" className="w-full h-11 bg-white hover:bg-gray-50 text-gray-700 border-gray-300">
+              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+              </svg>
+              Sign in with Google
+            </Button>
+          </form>
         </div>
       </div>
 
