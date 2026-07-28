@@ -2,151 +2,287 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { adminApi } from '@/lib/api';
-import { Spinner } from '@/components/ui/Spinner';
 import { toast } from 'react-hot-toast';
-import { Search } from 'lucide-react';
-import { useViewMode } from '@/hooks';
+import {
+  BookOpen,
+  Calendar,
+  Clock3,
+  Download,
+  FolderPlus,
+  Layers3,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings2,
+  Sparkles,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  Upload,
+  Tag,
+} from 'lucide-react';
+import { getAdminQuizzes } from '@/app/actions/quizAdminActions';
+import {
+  getCategoriesWithSubjects,
+  type QuizCategoryWithSubjects,
+} from '@/app/actions/taxonomyActions';
+import { TaxonomyManager } from '@/components/admin/dashboard/TaxonomyManager';
+import { Spinner } from '@/components/ui/Spinner';
+import { adminApi } from '@/lib/api';
 
-interface Quiz {
+type QuizCategoryRelation = { id?: string; name?: string | null } | { name?: string | null }[] | null | undefined;
+type QuizSubjectRelation = { id?: string; name?: string | null } | { name?: string | null }[] | null | undefined;
+
+interface AdminQuiz {
   id: string;
   title: string;
-  subject?: string | null;
-  year?: number;
-  isPublished: boolean;
-  category?: { id: string; name: string } | null;
-  _count?: {
-    questions: number;
-  };
+  category_id?: string | null;
+  subject_id?: string | null;
+  subject?: string | QuizSubjectRelation;
+  year?: number | null;
+  duration_sec?: number | null;
+  is_published?: boolean | null;
+  category?: QuizCategoryRelation;
 }
 
-const ROW_ICON_STYLES = [
-  { container: 'bg-primary-fixed text-primary', icon: 'code' },
-  { container: 'bg-orange-100 text-orange-600', icon: 'functions' },
-  { container: 'bg-emerald-100 text-emerald-600', icon: 'psychology' },
-] as const;
-
-function MaterialIcon({
-  name,
-  className = '',
-  filled = false,
-}: {
-  name: string;
-  className?: string;
-  filled?: boolean;
-}) {
-  return (
-    <span
-      className={`material-symbols-outlined inline-block align-middle ${className}`}
-      style={
-        filled
-          ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" }
-          : { fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }
-      }
-    >
-      {name}
-    </span>
-  );
+function getCategoryName(category: QuizCategoryRelation): string {
+  if (Array.isArray(category)) return category[0]?.name || 'Uncategorized';
+  return category?.name || 'Uncategorized';
 }
 
-function questionProgressWidth(count: number): string {
-  const pct = Math.min(100, Math.round((count / 40) * 100));
-  if (pct >= 100) return 'w-full';
-  if (pct >= 75) return 'w-3/4';
-  if (pct >= 50) return 'w-1/2';
-  if (pct >= 25) return 'w-1/4';
-  return 'w-1/12';
+function getSubjectName(subject: string | QuizSubjectRelation): string {
+  if (typeof subject === 'string') return subject;
+  if (Array.isArray(subject)) return subject[0]?.name || 'General';
+  return subject?.name || 'General';
+}
+
+function formatDuration(seconds?: number | null): string {
+  if (!seconds || seconds <= 0) return 'Not set';
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+}
+
+function csvCell(value: string | number | boolean | null | undefined): string {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
 export default function AdminQuizzesPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [allQuizzes, setAllQuizzes] = useState<AdminQuiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalQuizzes, setTotalQuizzes] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedSearch, setSubmittedSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useViewMode('learnify:admin-quizzes:viewMode');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeCount, setActiveCount] = useState(0);
-  const [draftCount, setDraftCount] = useState(0);
+
+  // Taxonomy State
+  const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [isTaxonomyOpen, setIsTaxonomyOpen] = useState(false);
 
   const limit = 12;
 
-  const fetchQuizzes = async (page: number = 1, search: string = '') => {
-    setIsLoading(true);
-    setError(null);
-    setSelectedIds([]);
+  const fetchTaxonomy = async () => {
     try {
-      const response = await adminApi.listQuizzes({ search: search || undefined });
-      const allQuizzes = Array.isArray(response.data?.data) ? response.data.data : [];
-      const total = allQuizzes.length;
-      const start = (page - 1) * limit;
-      const paginated = allQuizzes.slice(start, start + limit);
-      setQuizzes(paginated);
-      setTotalQuizzes(total);
-      setActiveCount(allQuizzes.filter((quiz) => quiz.isPublished).length);
-      setDraftCount(allQuizzes.filter((quiz) => !quiz.isPublished).length);
-      setTotalPages(Math.max(1, Math.ceil(total / limit)));
-      setCurrentPage(page);
-    } catch {
-      setError('Failed to load quizzes');
-      setQuizzes([]);
-    } finally {
-      setIsLoading(false);
+      const data = await getCategoriesWithSubjects();
+      setTaxonomy(data);
+    } catch (err) {
+      console.error('Failed to load taxonomy:', err);
     }
   };
 
-  const toggleSelection = (id: string, checked: boolean) => {
-    if (checked) setSelectedIds((prev) => [...prev, id]);
-    else setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+  const fetchQuizzes = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (silent) setIsRefreshing(true);
+    else setIsLoading(true);
+
+    setError(null);
+    setSelectedIds([]);
+
+    try {
+      const [quizzes] = await Promise.all([getAdminQuizzes(), fetchTaxonomy()]);
+      setAllQuizzes(Array.isArray(quizzes) ? (quizzes as AdminQuiz[]) : []);
+    } catch {
+      setError('Failed to load quizzes from Supabase.');
+      setAllQuizzes([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQuizzes();
+  }, []);
+
+  // Filter available subjects based on selected category
+  const availableSubjects = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    const cat = taxonomy.find((c) => c.id === selectedCategoryId);
+    return cat ? cat.subjects : [];
+  }, [taxonomy, selectedCategoryId]);
+
+  const filteredQuizzes = useMemo(() => {
+    const query = submittedSearch.trim().toLowerCase();
+
+    return allQuizzes.filter((quiz) => {
+      // Category filter
+      if (selectedCategoryId) {
+        const catName = taxonomy.find((c) => c.id === selectedCategoryId)?.name;
+        const quizCatName = getCategoryName(quiz.category);
+        const matchesCatId = quiz.category_id === selectedCategoryId;
+        const matchesCatName = quizCatName === catName;
+        if (!matchesCatId && !matchesCatName) return false;
+      }
+
+      // Subject filter
+      if (selectedSubjectId) {
+        const selectedSubjObj = availableSubjects.find((s) => s.id === selectedSubjectId);
+        const quizSubjName = getSubjectName(quiz.subject);
+        const matchesSubjId = quiz.subject_id === selectedSubjectId;
+        const matchesSubjName = selectedSubjObj && quizSubjName === selectedSubjObj.name;
+        if (!matchesSubjId && !matchesSubjName) return false;
+      }
+
+      // Search Query filter
+      if (query) {
+        const categoryName = getCategoryName(quiz.category);
+        const subjectName = getSubjectName(quiz.subject);
+        const haystack = [quiz.title, subjectName, categoryName, quiz.year]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        if (!haystack.includes(query)) return false;
+      }
+
+      return true;
+    });
+  }, [allQuizzes, submittedSearch, selectedCategoryId, selectedSubjectId, taxonomy, availableSubjects]);
+
+  const totalQuizzes = filteredQuizzes.length;
+  const totalPages = Math.max(1, Math.ceil(totalQuizzes / limit));
+  const visibleQuizzes = filteredQuizzes.slice((currentPage - 1) * limit, currentPage * limit);
+  const publishedCount = allQuizzes.filter((quiz) => Boolean(quiz.is_published)).length;
+  const draftCount = allQuizzes.length - publishedCount;
+  const timedCount = allQuizzes.filter((quiz) => Boolean(quiz.duration_sec && quiz.duration_sec > 0)).length;
+
+  const allVisibleSelected =
+    visibleQuizzes.length > 0 && visibleQuizzes.every((quiz) => selectedIds.includes(quiz.id));
+
+  const showingFrom = totalQuizzes === 0 ? 0 : (currentPage - 1) * limit + 1;
+  const showingTo = Math.min(currentPage * limit, totalQuizzes);
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmittedSearch(searchQuery);
+    setCurrentPage(1);
   };
 
   const handleSelectAll = (checked: boolean) => {
+    const visibleIds = visibleQuizzes.map((quiz) => quiz.id);
+
     if (checked) {
-      const visibleIds = quizzes.map((q) => q.id);
-      setSelectedIds((prev) => {
-        const union = new Set([...prev, ...visibleIds]);
-        return Array.from(union);
-      });
-    } else {
-      const visibleIds = quizzes.map((q) => q.id);
-      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+      return;
     }
+
+    setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+  };
+
+  const toggleSelection = (id: string, checked: boolean) => {
+    setSelectedIds((prev) =>
+      checked ? Array.from(new Set([...prev, id])) : prev.filter((selectedId) => selectedId !== id)
+    );
+  };
+
+  const handleExportQuizzes = () => {
+    const quizzesToExport = filteredQuizzes;
+
+    if (quizzesToExport.length === 0) {
+      toast.error('No quizzes to export');
+      return;
+    }
+
+    const headers = ['Title', 'Subject', 'Year', 'Duration', 'Status', 'Category'];
+    const csvContent = [
+      headers.map(csvCell).join(','),
+      ...quizzesToExport.map((quiz) =>
+        [
+          quiz.title,
+          getSubjectName(quiz.subject),
+          quiz.year || '',
+          formatDuration(quiz.duration_sec),
+          quiz.is_published ? 'Published' : 'Draft',
+          getCategoryName(quiz.category),
+        ]
+          .map(csvCell)
+          .join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `quizzes_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${quizzesToExport.length} quizzes`);
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to delete this quiz? This action is irreversible and will delete all user attempts.'
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm('Delete this quiz? This action is irreversible.')) return;
+
     try {
       await adminApi.deleteQuiz(quizId);
       toast.success('Quiz deleted successfully');
-      fetchQuizzes(currentPage, searchQuery);
+      await fetchQuizzes({ silent: true });
     } catch {
       toast.error('Failed to delete quiz');
     }
   };
 
   const handleBulkDelete = async () => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete the ${selectedIds.length} selected quizzes? This will delete all associated questions and attempts.`
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`Delete the ${selectedIds.length} selected quizzes?`)) return;
+
     try {
       await Promise.all(selectedIds.map((id) => adminApi.deleteQuiz(id)));
       toast.success('Selected quizzes deleted successfully');
-      setSelectedIds([]);
-      fetchQuizzes(1, searchQuery);
+      setCurrentPage(1);
+      await fetchQuizzes({ silent: true });
     } catch {
       toast.error('Failed to delete some quizzes');
+    }
+  };
+
+  const handleToggleStatus = async (quizId: string, currentStatus: boolean) => {
+    const previousQuizzes = allQuizzes;
+
+    setAllQuizzes((prev) =>
+      prev.map((quiz) =>
+        quiz.id === quizId ? { ...quiz, is_published: !currentStatus } : quiz
+      )
+    );
+
+    try {
+      await adminApi.toggleQuizStatus(quizId, { isPublished: !currentStatus });
+      toast.success(`Quiz ${!currentStatus ? 'published' : 'moved to draft'}`);
+      await fetchQuizzes({ silent: true });
+    } catch {
+      setAllQuizzes(previousQuizzes);
+      toast.error('Failed to update status');
     }
   };
 
@@ -155,436 +291,323 @@ export default function AdminQuizzesPage() {
       await Promise.all(
         selectedIds.map((id) => adminApi.toggleQuizStatus(id, { isPublished }))
       );
-      toast.success(`Selected quizzes set to ${isPublished ? 'Live' : 'Draft'}`);
-      setSelectedIds([]);
-      fetchQuizzes(currentPage, searchQuery);
+      toast.success(`Selected quizzes set to ${isPublished ? 'Published' : 'Draft'}`);
+      await fetchQuizzes({ silent: true });
     } catch {
       toast.error('Failed to update status for some quizzes');
     }
   };
 
-  useEffect(() => {
-    fetchQuizzes();
-  }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchQuizzes(1, searchQuery);
-  };
-
-  const handlePageChange = (page: number) => {
-    fetchQuizzes(page, searchQuery);
-  };
-
-  const handleExportQuizzes = async () => {
-    try {
-      const response = await adminApi.listQuizzes();
-      const allQuizzes = Array.isArray(response.data?.data) ? response.data.data : [];
-
-      if (allQuizzes.length === 0) {
-        alert('No quizzes to export');
-        return;
-      }
-
-      const headers = ['Title', 'Subject', 'Category', 'Questions Count', 'Status'];
-      const csvContent = [
-        headers.join(','),
-        ...allQuizzes.map((quiz) =>
-          [
-            `"${quiz.title}"`,
-            `"${quiz.subject || '-'}"`,
-            `"${quiz.category?.name || '-'}"`,
-            quiz._count?.questions ?? 0,
-            quiz.isPublished ? 'Live' : 'Draft',
-          ].join(',')
-        ),
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `quizzes_export_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      alert(`Exported ${allQuizzes.length} quizzes successfully`);
-    } catch {
-      alert('Failed to export quizzes');
-    }
-  };
-
-  const handleToggleStatus = async (quizId: string, currentStatus: boolean) => {
-    const previousQuizzes = [...quizzes];
-    setQuizzes((prev) =>
-      prev.map((q) => (q.id === quizId ? { ...q, isPublished: !currentStatus } : q))
-    );
-
-    try {
-      await adminApi.toggleQuizStatus(quizId, { isPublished: !currentStatus });
-      toast.success(`Quiz ${!currentStatus ? 'published' : 'moved to draft'}`);
-    } catch {
-      setQuizzes(previousQuizzes);
-      toast.error('Failed to update status');
-    }
-  };
-
-  const allVisibleSelected = useMemo(
-    () => quizzes.length > 0 && quizzes.every((q) => selectedIds.includes(q.id)),
-    [quizzes, selectedIds]
-  );
-
-  const showingFrom = totalQuizzes === 0 ? 0 : (currentPage - 1) * limit + 1;
-  const showingTo = Math.min(currentPage * limit, totalQuizzes);
-
   return (
-    <div className="mx-auto w-full max-w-[1440px] pb-12">
-      {/* Page Header */}
-      <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto w-full max-w-7xl pb-10 font-sans text-[#191c1e] antialiased">
+      <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-headline-lg text-headline-lg tracking-tight text-slate-900">
-            Quizzes Management
-          </h2>
-          <p className="mt-1 text-on-surface-variant">
-            Organize and track performance of your educational assessments.
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4f46e5]">
+            Admin Console
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#191c1e] md:text-4xl">
+            Quiz Management
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b5a68]">
+            Review, publish, and maintain assessments from your Supabase quiz catalog.
           </p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => setIsTaxonomyOpen(true)}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
+          >
+            <FolderPlus className="h-4 w-4 text-[#3525cd]" />
+            Manage Categories
+          </button>
+          <button
+            type="button"
+            onClick={() => fetchQuizzes({ silent: true })}
+            disabled={isRefreshing}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
           <button
             type="button"
             onClick={handleExportQuizzes}
-            className="flex items-center gap-2 border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl font-semibold bg-white hover:bg-slate-50 transition-all"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
           >
-            <MaterialIcon name="download" className="text-base" />
+            <Download className="h-4 w-4" />
             Export CSV
           </button>
-          <Link href="/admin/quizzes/create">
-            <button
-              type="button"
-              className="flex items-center gap-2 bg-primary-container text-on-primary px-6 py-3 rounded-2xl font-semibold shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all"
-            >
-              <MaterialIcon name="add_circle" />
-              Create Full Quiz
-            </button>
+          <Link
+            href="/admin/quizzes/create/ai"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd]/10 px-4 text-sm font-semibold text-[#3525cd] border border-[#3525cd]/20 transition hover:bg-[#3525cd]/20"
+          >
+            <Sparkles className="h-4 w-4" />
+            Create with AI
+          </Link>
+          <Link
+            href="/admin/quizzes/create"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
+          >
+            <Plus className="h-4 w-4" />
+            Create Quiz
           </Link>
         </div>
       </div>
 
-      {/* Bento Stats Grid */}
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <div className="bento-card flex h-40 flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-start justify-between">
-            <span className="font-label-sm text-xs uppercase tracking-wider text-outline">
-              Total Quizzes
-            </span>
-            <div className="rounded-lg bg-primary/5 p-2 text-primary">
-              <MaterialIcon name="quiz" />
-            </div>
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Total</span>
+            <BookOpen className="h-4 w-4 text-[#4f46e5]" />
           </div>
-          <div>
-            <div className="font-headline-md text-3xl font-bold text-slate-900">
-              {totalQuizzes}
-            </div>
-            <div className="mt-1 text-xs font-medium text-secondary">Across all categories</div>
-          </div>
+          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{allQuizzes.length}</div>
+          <p className="mt-1 text-xs text-[#777586]">Supabase quizzes</p>
         </div>
-
-        <div className="bento-card flex h-40 flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-start justify-between">
-            <span className="font-label-sm text-xs uppercase tracking-wider text-outline">
-              Active
-            </span>
-            <div className="rounded-lg bg-secondary/5 p-2 text-secondary">
-              <MaterialIcon name="rocket_launch" />
-            </div>
+        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Published</span>
+            <ToggleRight className="h-4 w-4 text-emerald-600" />
           </div>
-          <div>
-            <div className="font-headline-md text-3xl font-bold text-slate-900">{activeCount}</div>
-            <div className="mt-1 text-xs font-medium text-on-surface-variant">
-              Published and live
-            </div>
-          </div>
+          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{publishedCount}</div>
+          <p className="mt-1 text-xs text-[#777586]">Visible to students</p>
         </div>
-
-        <div className="bento-card flex h-40 flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-start justify-between">
-            <span className="font-label-sm text-xs uppercase tracking-wider text-outline">
-              Drafts
-            </span>
-            <div className="rounded-lg bg-tertiary/5 p-2 text-tertiary">
-              <MaterialIcon name="edit_note" />
-            </div>
+        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Drafts</span>
+            <ToggleLeft className="h-4 w-4 text-[#777586]" />
           </div>
-          <div>
-            <div className="font-headline-md text-3xl font-bold text-slate-900">{draftCount}</div>
-            <div className="mt-1 text-xs font-medium text-on-surface-variant">Requires review</div>
-          </div>
+          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{draftCount}</div>
+          <p className="mt-1 text-xs text-[#777586]">Awaiting publish</p>
         </div>
-
-        <div className="bento-card flex h-40 flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-start justify-between">
-            <span className="font-label-sm text-xs uppercase tracking-wider text-outline">
-              Total Completions
-            </span>
-            <div className="rounded-lg bg-primary/5 p-2 text-primary">
-              <MaterialIcon name="check_circle" />
-            </div>
+        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Timed</span>
+            <Clock3 className="h-4 w-4 text-[#4f46e5]" />
           </div>
-          <div>
-            <div className="font-headline-md text-3xl font-bold text-slate-900">12.5k</div>
-            <div className="mt-1 text-xs font-medium text-secondary">+2.4k this week</div>
-          </div>
+          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{timedCount}</div>
+          <p className="mt-1 text-xs text-[#777586]">With duration set</p>
         </div>
       </div>
 
-      {/* Unified Action Bar */}
-      <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-gray-200 mb-6 shadow-sm">
-        <form onSubmit={handleSearch} className="flex w-full flex-col gap-2 sm:max-w-xl sm:flex-row sm:items-center">
-          <div className="group relative w-full">
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-outline transition-colors group-focus-within:text-primary"
-            />
+      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-[#e4e6ef] bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <form onSubmit={handleSearch} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-3xl">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search quizzes..."
-              className="min-h-[44px] w-full rounded-xl border border-transparent bg-surface-container-low py-2 pl-10 pr-4 text-sm text-gray-900 outline-none transition-all focus:border-primary focus:ring-0"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by title, subject, or category"
+              className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-10 pr-4 text-sm text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#4f46e5] focus:bg-white focus:ring-4 focus:ring-[#4f46e5]/10"
             />
           </div>
+
+          {/* Category Filter Select */}
+          <select
+            value={selectedCategoryId}
+            onChange={(e) => {
+              setSelectedCategoryId(e.target.value);
+              setSelectedSubjectId('');
+              setCurrentPage(1);
+            }}
+            className="min-h-11 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white sm:w-44"
+          >
+            <option value="">All Categories</option>
+            {taxonomy.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Subject Filter Select */}
+          <select
+            value={selectedSubjectId}
+            onChange={(e) => {
+              setSelectedSubjectId(e.target.value);
+              setCurrentPage(1);
+            }}
+            disabled={!selectedCategoryId || availableSubjects.length === 0}
+            className="min-h-11 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white disabled:opacity-50 sm:w-44"
+          >
+            <option value="">All Subjects</option>
+            {availableSubjects.map((subj) => (
+              <option key={subj.id} value={subj.id}>
+                {subj.name}
+              </option>
+            ))}
+          </select>
+
           <button
             type="submit"
-            className="min-h-[44px] rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary transition-all hover:opacity-90"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#3525cd] px-5 text-sm font-semibold text-white transition hover:bg-[#2f20b8]"
           >
             Search
           </button>
         </form>
 
-        <div className="flex min-h-[44px] items-center">
+        <div className="flex min-h-11 flex-wrap items-center gap-2">
           {selectedIds.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-3 duration-200 animate-in fade-in zoom-in-95">
-              <span className="rounded-full border border-purple-100 bg-primary-fixed px-3 py-1.5 text-sm font-medium text-primary">
-                {selectedIds.length} Selected
+            <>
+              <span className="rounded-full bg-[#3525cd]/10 px-3 py-1 text-xs font-semibold text-[#3525cd]">
+                {selectedIds.length} selected
               </span>
               <button
                 type="button"
                 onClick={() => handleBulkStatus(true)}
-                className="min-h-[40px] rounded-xl border border-surface-variant/50 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-all hover:bg-surface-container"
+                className="rounded-lg border border-[#dadce5] bg-white px-3 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
               >
-                Set Live
+                Publish
               </button>
               <button
                 type="button"
                 onClick={() => handleBulkStatus(false)}
-                className="min-h-[40px] rounded-xl border border-surface-variant/50 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-all hover:bg-surface-container"
+                className="rounded-lg border border-[#dadce5] bg-white px-3 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
               >
-                Set Draft
+                Draft
               </button>
-              <div className="mx-1 hidden h-6 w-px bg-surface-variant/50 sm:block" />
               <button
                 type="button"
                 onClick={handleBulkDelete}
-                className="min-h-[40px] rounded-xl border border-red-200 bg-error-container/30 px-3 py-1.5 text-sm font-semibold text-error transition-all hover:bg-error-container/50"
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
               >
                 Delete
               </button>
-            </div>
+            </>
           ) : (
-            <span className="text-sm italic text-outline">
-              {viewMode === 'list' ? 'Select rows for bulk actions' : ''}
-            </span>
+            <span className="px-1 text-sm text-[#777586]">Select rows for bulk actions</span>
           )}
         </div>
       </div>
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex justify-center py-12">
+      {isLoading ? (
+        <div className="flex min-h-72 items-center justify-center rounded-xl border border-[#e4e6ef] bg-white">
           <Spinner size="lg" />
         </div>
-      )}
+      ) : null}
 
-      {/* Error State */}
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">{error}</div>
-      )}
+      {!isLoading && error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
 
-      {/* Main List Bento Card */}
-      {!isLoading && !error && quizzes.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200/75 bg-white">
-          <div className="flex flex-col gap-4 border-b border-surface-variant/50 bg-surface-container-lowest px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-              <h3 className="font-headline-md text-slate-900">Recent Quizzes</h3>
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full bg-primary-fixed px-3 py-1 text-xs font-semibold text-primary">
-                  All
-                </span>
-                {searchQuery ? (
-                  <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-semibold text-outline">
-                    &ldquo;{searchQuery}&rdquo;
-                  </span>
-                ) : null}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-lg p-2 text-outline transition-all hover:bg-surface-container"
-                aria-label="Filter quizzes"
-              >
-                <MaterialIcon name="filter_list" />
-              </button>
-              <button
-                type="button"
-                className="rounded-lg p-2 text-outline transition-all hover:bg-surface-container"
-                aria-label="Sort quizzes"
-              >
-                <MaterialIcon name="sort" />
-              </button>
+      {!isLoading && !error && visibleQuizzes.length > 0 ? (
+        <div className="overflow-hidden rounded-xl border border-[#e4e6ef] bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[#eceef5] bg-[#fbfbfd] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-[#191c1e]">Quizzes</h2>
+              <p className="text-sm text-[#777586]">
+                Showing {showingFrom}-{showingTo} of {totalQuizzes}
+                {submittedSearch ? ` matching "${submittedSearch}"` : ''}
+              </p>
             </div>
           </div>
 
           <div className="w-full overflow-x-auto">
-            <table className="w-full border-collapse text-left">
+            <table className="w-full min-w-[920px] border-collapse text-left">
               <thead>
-                <tr className="bg-surface-container-low">
-                  <th className="w-12 px-4 py-4 sm:px-8">
+                <tr className="border-b border-[#eceef5] bg-[#f7f7fb]">
+                  <th className="w-12 px-5 py-3">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20"
-                      aria-label="Select all quizzes on this page"
+                      onChange={(event) => handleSelectAll(event.target.checked)}
+                      className="h-4 w-4 rounded border-[#c9cbd6] text-[#3525cd] focus:ring-[#4f46e5]/20"
+                      aria-label="Select all visible quizzes"
                     />
                   </th>
-                  <th className="px-4 py-4 text-xs font-label-sm uppercase tracking-widest text-outline sm:px-8">
-                    Title
-                  </th>
-                  <th className="px-4 py-4 text-xs font-label-sm uppercase tracking-widest text-outline sm:px-8">
-                    Subject
-                  </th>
-                  <th className="hidden px-4 py-4 text-xs font-label-sm uppercase tracking-widest text-outline md:table-cell sm:px-8">
-                    Category
-                  </th>
-                  <th className="px-4 py-4 text-xs font-label-sm uppercase tracking-widest text-outline sm:px-8">
-                    Questions
-                  </th>
-                  <th className="px-4 py-4 text-xs font-label-sm uppercase tracking-widest text-outline sm:px-8">
-                    Status
-                  </th>
-                  <th className="px-4 py-4 text-right text-xs font-label-sm uppercase tracking-widest text-outline sm:px-8">
-                    Actions
-                  </th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Title</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Subject</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Year</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Duration</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Category</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Status</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-variant/40">
-                {quizzes.map((quiz, index) => {
-                  const questionCount = quiz._count?.questions ?? 0;
-                  const rowStyle = ROW_ICON_STYLES[index % ROW_ICON_STYLES.length];
-                  const subjectLabel = quiz.subject || quiz.category?.name || 'General';
-                  const categoryLabel = quiz.category?.name || quiz.subject || '—';
+              <tbody className="divide-y divide-[#eceef5]">
+                {visibleQuizzes.map((quiz) => {
+                  const isPublished = Boolean(quiz.is_published);
+                  const categoryName = getCategoryName(quiz.category);
+                  const subjectName = getSubjectName(quiz.subject);
 
                   return (
-                    <tr
-                      key={quiz.id}
-                      className="group transition-colors hover:bg-surface-bright"
-                    >
-                      <td className="px-4 py-5 sm:px-8">
+                    <tr key={quiz.id} className="group transition hover:bg-[#fbfbfd]">
+                      <td className="px-5 py-3">
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(quiz.id)}
-                          onChange={(e) => toggleSelection(quiz.id, e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20"
+                          onChange={(event) => toggleSelection(quiz.id, event.target.checked)}
+                          className="h-4 w-4 rounded border-[#c9cbd6] text-[#3525cd] focus:ring-[#4f46e5]/20"
                           aria-label={`Select ${quiz.title}`}
                         />
                       </td>
-                      <td className="px-4 py-5 sm:px-8">
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rowStyle.container}`}
-                          >
-                            <MaterialIcon name={rowStyle.icon} />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-slate-900 transition-colors group-hover:text-primary">
-                              {quiz.title}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              {quiz.year ? `Year ${quiz.year}` : 'Medical assessment'}
-                            </div>
+                      <td className="px-5 py-3">
+                        <div className="max-w-md">
+                          <div className="truncate text-sm font-semibold text-[#191c1e]">{quiz.title}</div>
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#777586]">
+                            <Layers3 className="h-3.5 w-3.5" />
+                            {categoryName}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-5 sm:px-8">
-                        <span className="inline-block rounded-lg bg-tertiary-fixed px-3 py-1 text-xs font-medium text-on-tertiary-fixed-variant">
-                          {subjectLabel}
+                      <td className="px-5 py-3">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f0ff] px-2.5 py-1 text-xs font-semibold text-[#3525cd]">
+                          <Tag className="h-3 w-3" />
+                          {subjectName}
                         </span>
                       </td>
-                      <td className="hidden px-4 py-5 md:table-cell sm:px-8">
-                        <span className="inline-block rounded-lg bg-surface-container px-3 py-1 text-xs font-medium text-outline">
-                          {categoryLabel}
+                      <td className="px-5 py-3 text-sm font-medium text-[#4b4a58]">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-[#8d8b99]" />
+                          {quiz.year || 'Any'}
                         </span>
                       </td>
-                      <td className="px-4 py-5 sm:px-8">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm text-slate-700">{questionCount}</span>
-                          <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="w-full h-full bg-primary rounded-full"></div>
-                          </div>
-                        </div>
+                      <td className="px-5 py-3 text-sm font-medium text-[#4b4a58]">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock3 className="h-3.5 w-3.5 text-[#8d8b99]" />
+                          {formatDuration(quiz.duration_sec)}
+                        </span>
                       </td>
-                      <td className="px-4 py-5 sm:px-8">
+                      <td className="px-5 py-3 text-sm text-[#5b5a68]">{categoryName}</td>
+                      <td className="px-5 py-3">
                         <button
                           type="button"
-                          onClick={() => handleToggleStatus(quiz.id, quiz.isPublished)}
-                          className="transition-opacity hover:opacity-80"
-                          title={quiz.isPublished ? 'Set to draft' : 'Set live'}
+                          onClick={() => handleToggleStatus(quiz.id, isPublished)}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
+                            isPublished
+                              ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15'
+                              : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/15'
+                          }`}
+                          title={isPublished ? 'Move to draft' : 'Publish quiz'}
                         >
-                          {quiz.isPublished ? (
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 bg-secondary rounded-full"></span>
-                              <span className="font-label-sm text-secondary text-xs font-bold uppercase tracking-wider">
-                                Live
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 bg-outline rounded-full"></span>
-                              <span className="font-label-sm text-outline text-xs font-bold uppercase tracking-wider">
-                                Draft
-                              </span>
-                            </div>
-                          )}
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              isPublished ? 'bg-emerald-500' : 'bg-gray-400'
+                            }`}
+                          />
+                          {isPublished ? 'Published' : 'Draft'}
                         </button>
                       </td>
-                      <td className="px-4 py-5 text-right sm:px-8">
-                        <div className="flex items-center justify-end gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
-                          <Link href={`/admin/quizzes/${quiz.id}/edit`}>
-                            <button
-                              type="button"
-                              className="rounded-lg p-2 text-primary transition-all hover:bg-primary-fixed"
-                              title="Edit"
-                            >
-                              <MaterialIcon name="edit" />
-                            </button>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={`/admin/quizzes/${quiz.id}/edit`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#3525cd] transition hover:bg-[#3525cd]/10"
+                            aria-label={`Edit ${quiz.title}`}
+                          >
+                            <Pencil className="h-4 w-4" />
                           </Link>
                           <button
                             type="button"
-                            className="rounded-lg p-2 text-outline transition-all hover:bg-surface-container-high"
-                            title="View Analytics"
-                          >
-                            <MaterialIcon name="bar_chart" />
-                          </button>
-                          <button
-                            type="button"
                             onClick={() => handleDeleteQuiz(quiz.id)}
-                            className="rounded-lg p-2 text-error transition-all hover:bg-error-container/10"
-                            title="Delete"
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
+                            aria-label={`Delete ${quiz.title}`}
                           >
-                            <MaterialIcon name="delete" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -595,109 +618,87 @@ export default function AdminQuizzesPage() {
             </table>
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-surface-variant/30 bg-surface-container-lowest px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <span className="text-sm font-medium text-outline">
-              Showing {showingFrom}&ndash;{showingTo} of {totalQuizzes} quizzes
+          <div className="flex flex-col gap-3 border-t border-[#eceef5] bg-[#fbfbfd] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-medium text-[#696778]">
+              Page {currentPage} of {totalPages}
             </span>
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => handlePageChange(currentPage - 1)}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                 disabled={currentPage === 1}
-                className="min-h-[44px] rounded-xl border border-surface-variant/50 px-4 py-2 text-sm font-semibold text-outline transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-10 rounded-lg border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Previous
               </button>
               <button
                 type="button"
-                onClick={() => handlePageChange(currentPage + 1)}
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                 disabled={currentPage === totalPages}
-                className="min-h-[44px] rounded-xl border border-primary/20 px-4 py-2 text-sm font-semibold text-primary transition-all hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-10 rounded-lg border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#3525cd] transition hover:bg-[#f1f0ff] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Next
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Empty State */}
-      {!isLoading && !error && quizzes.length === 0 && (
-        <div className="rounded-2xl border border-gray-200/75 bg-white py-16 text-center">
-          <MaterialIcon name="quiz" className="mx-auto text-5xl text-outline" />
-          <h3 className="mt-4 text-lg font-medium text-slate-900">No quizzes found</h3>
-          <p className="mt-2 text-on-surface-variant">
-            {searchQuery
-              ? 'Try adjusting your search terms.'
-              : 'Get started by creating your first quiz.'}
+      {!isLoading && !error && visibleQuizzes.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[#cfd1dc] bg-white px-6 py-16 text-center shadow-sm">
+          <BookOpen className="mx-auto h-10 w-10 text-[#8d8b99]" />
+          <h2 className="mt-4 text-lg font-bold tracking-tight text-[#191c1e]">No quizzes found</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#696778]">
+            {submittedSearch || selectedCategoryId || selectedSubjectId
+              ? 'No Supabase quizzes match your filter criteria. Try clearing search, category, or subject filters.'
+              : 'Create your first quiz to start building the assessment catalog.'}
           </p>
-          {!searchQuery && (
-            <Link href="/admin/quizzes/create">
-              <button
-                type="button"
-                className="mx-auto mt-6 flex min-h-[44px] items-center gap-2 rounded-2xl bg-primary-container px-6 py-3 text-sm font-semibold text-on-primary shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
-              >
-                <MaterialIcon name="add_circle" />
-                Create Full Quiz
-              </button>
+          {!submittedSearch && !selectedCategoryId && !selectedSubjectId ? (
+            <Link
+              href="/admin/quizzes/create"
+              className="mt-6 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
+            >
+              <Plus className="h-4 w-4" />
+              Create Quiz
             </Link>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
 
-      {/* Bottom Action Grid */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="bento-card flex flex-col justify-between rounded-2xl bg-primary-container p-8 text-on-primary transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div>
-            <h4 className="font-headline-md leading-tight">Generate Quiz with AI</h4>
-            <p className="mb-6 mt-2 text-sm text-on-primary-container/80">
-              Create comprehensive assessments in seconds using your course material.
-            </p>
-          </div>
-          <Link href="/admin/quizzes/create">
-            <button
-              type="button"
-              className="min-h-[44px] w-fit rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-primary transition-all hover:bg-primary-fixed"
-            >
-              Try AI Builder
-            </button>
-          </Link>
-        </div>
-
-        <div className="bento-card flex flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div>
-            <h4 className="font-headline-md text-slate-900">Import Questions</h4>
-            <p className="mb-6 mt-2 text-sm text-slate-500">
-              Upload bulk questions using CSV, JSON or Excel templates.
-            </p>
-          </div>
-          <Link href="/admin/quizzes/import">
-            <button
-              type="button"
-              className="flex min-h-[44px] w-fit items-center gap-2 rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-            >
-              <MaterialIcon name="upload_file" className="text-sm" />
-              Upload File
-            </button>
-          </Link>
-        </div>
-
-        <div className="bento-card flex flex-col justify-between rounded-2xl border border-gray-200/75 bg-white p-8 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div>
-            <h4 className="font-headline-md text-slate-900">Quiz Settings</h4>
-            <p className="mb-6 mt-2 text-sm text-slate-500">
-              Manage global time limits, proctoring, and grading rules.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="flex min-h-[44px] w-fit items-center gap-2 rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50"
-          >
-            <MaterialIcon name="settings" className="text-sm" />
-            Configure
-          </button>
-        </div>
+      <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Link
+          href="/admin/quizzes/create/ai"
+          className="rounded-xl border border-[#3525cd]/15 bg-[#3525cd] p-5 text-white shadow-sm shadow-[#3525cd]/20 transition hover:bg-[#2f20b8]"
+        >
+          <Sparkles className="h-5 w-5" />
+          <h3 className="mt-4 text-base font-bold tracking-tight text-white">Generate Quiz with AI</h3>
+          <p className="mt-1 text-sm leading-6 text-white/80">Create assessments from course material.</p>
+        </Link>
+        <Link
+          href="/admin/quizzes/import"
+          className="rounded-xl border border-[#e4e6ef] bg-[#white] p-5 shadow-sm transition hover:bg-[#fbfbfd]"
+        >
+          <Upload className="h-5 w-5 text-[#3525cd]" />
+          <h3 className="mt-4 text-base font-bold tracking-tight text-[#191c1e]">Import Questions</h3>
+          <p className="mt-1 text-sm leading-6 text-[#696778]">Upload CSV, JSON, or Excel templates.</p>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setIsTaxonomyOpen(true)}
+          className="rounded-xl border border-[#e4e6ef] bg-white p-5 text-left shadow-sm transition hover:bg-[#fbfbfd]"
+        >
+          <Settings2 className="h-5 w-5 text-[#3525cd]" />
+          <h3 className="mt-4 text-base font-bold tracking-tight text-[#191c1e]">Quiz Taxonomy</h3>
+          <p className="mt-1 text-sm leading-6 text-[#696778]">Manage global categories and subjects.</p>
+        </button>
       </div>
+
+      {/* Taxonomy Manager Slide-over Modal */}
+      <TaxonomyManager
+        isOpen={isTaxonomyOpen}
+        onClose={() => setIsTaxonomyOpen(false)}
+        onTaxonomyChange={fetchQuizzes}
+      />
     </div>
   );
 }

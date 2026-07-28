@@ -139,6 +139,14 @@ export const useAuth = () => {
       // fall through to the hard navigation below.
     }
 
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Silently ignore browser client signout errors if already cleared
+    }
+
     // Hard navigation flushes the Next.js router cache and forces the
     // middleware to re-evaluate the request without stale token cookies.
     window.location.href = '/login';

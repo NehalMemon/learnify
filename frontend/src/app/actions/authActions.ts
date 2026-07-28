@@ -2,24 +2,19 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-
 import { revalidatePath } from 'next/cache'
+import { extractErrorMessage } from '@/lib/utils'
 
 export async function loginWithEmail(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const rememberMe = formData.get('rememberMe') === 'true'
 
   if (!email || !password) {
     return { error: 'Email and password are required' }
   }
 
-  const supabase = await createClient()
-
-  // TODO: Remove after ECONNRESET debugging is complete
-  console.log('--- AUTH DEBUG ---');
-  console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-  console.log('Attempting login for:', email);
-  console.log('------------------');
+  const supabase = await createClient(rememberMe)
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
@@ -30,49 +25,54 @@ export async function loginWithEmail(formData: FormData) {
     return { error: error?.message || 'Login failed' }
   }
 
-  // Why: We return the path instead of calling redirect() because this action
-  // is invoked programmatically via `await` in LoginForm's onSubmit. Next.js
-  // redirect() throws a NEXT_REDIRECT error that propagates as an unhandled
-  // exception when called outside a <form action={...}> binding, preventing
-  // the navigation from completing on the client.
-  revalidatePath('/', 'layout')
-
-  const redirectTo = data.user.app_metadata?.role === 'ADMIN'
-    ? '/admin/dashboard'
-    : '/dashboard'
-
-  return { redirectTo }
+  // Direct redirect after successful login when used as a form action.
+  // Next.js will handle navigation and cache invalidation.
+  revalidatePath('/', 'layout');
+  redirect(data.user.app_metadata?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
 }
 
+
 export async function signUpWithEmail(formData: FormData) {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
-  const fullName = formData.get('fullName') as string
-  const phone = formData.get('phone') as string
+  try {
+    const email = formData.get('email') as string
+    const password = formData.get('password') as string
+    const fullName = formData.get('fullName') as string
+    const phone = formData.get('phone') as string
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' }
-  }
-
-  const supabase = await createClient()
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName || '',
-        phone: phone || null,
-      },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    if (!email || !password) {
+      return { error: 'Email and password are required' }
     }
-  })
 
-  if (error) {
-    return { error: error.message }
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName || '',
+          phone: phone || null,
+        },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      }
+    })
+
+    if (error) {
+      return { error: extractErrorMessage(error) }
+    }
+
+    const isDuplicate = Boolean(
+      data?.user && data?.user?.identities && data.user.identities.length === 0
+    );
+
+    if (isDuplicate) {
+      return { error: 'An account with this email already exists. Please sign in.' };
+    }
+
+    return { success: true, message: 'Check your email to continue.' }
+  } catch (err: unknown) {
+    return { error: extractErrorMessage(err) }
   }
-
-  return { success: true, message: 'Check your email to continue.' }
 }
 
 export async function logout() {

@@ -1,15 +1,7 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-  // BYPASS MIDDLEWARE FOR AUTH ROUTES
-  if (
-    request.nextUrl.pathname.startsWith('/login') ||
-    request.nextUrl.pathname.startsWith('/register') ||
-    request.nextUrl.pathname.startsWith('/auth/callback')
-  ) {
-    return NextResponse.next();
-  }
   return await updateSession(request)
 }
 
@@ -26,3 +18,4 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
+

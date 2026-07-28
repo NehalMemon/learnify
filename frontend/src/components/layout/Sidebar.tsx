@@ -1,203 +1,263 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
+  UserCircle2,
   BookOpen,
   Search,
   BrainCircuit,
   Trophy,
   Presentation,
-  UserCircle2,
   Settings,
+  Coins,
+  GraduationCap,
   LogOut,
-  X,
-  Lock,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/AuthProvider';
 import { createClient } from '@/utils/supabase/client';
 
-// Navigation links for the sidebar
-const NAV_LINKS = [
-  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard, requiresLearnify: false, requiresDoctorsQuizz: false },
-  { href: '/dashboard/profile', label: 'Profile & History', Icon: UserCircle2, requiresLearnify: false, requiresDoctorsQuizz: false },
-  { href: '/my-courses', label: 'My Courses', Icon: BookOpen, requiresLearnify: true, requiresDoctorsQuizz: false },
-  { href: '/dashboard/courses', label: 'Course Catalog', Icon: Search, requiresLearnify: true, requiresDoctorsQuizz: false },
-  { href: '/dashboard/quizzes', label: 'Quiz Catalog', Icon: BrainCircuit, requiresLearnify: false, requiresDoctorsQuizz: true },
-  { href: '/dashboard/leaderboard', label: 'Leaderboard', Icon: Trophy, requiresLearnify: false, requiresDoctorsQuizz: false },
-  { href: '/workshops', label: 'Workshops', Icon: Presentation, requiresLearnify: true, requiresDoctorsQuizz: false },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/credits', label: 'Buy Credits', icon: Coins },
+  { href: '/dashboard/profile', label: 'Profile & History', icon: UserCircle2 },
+  { href: '/my-courses', label: 'My Courses', icon: BookOpen },
+  { href: '/dashboard/courses', label: 'Course Catalog', icon: Search },
+  { href: '/dashboard/quizzes', label: 'Quiz Catalog', icon: BrainCircuit },
+  { href: '/dashboard/leaderboard', label: 'Leaderboard', icon: Trophy },
+  { href: '/workshops', label: 'Workshops', icon: Presentation },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 interface SidebarProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
   className?: string;
 }
 
-/**
- * Helper to generate initials from a full name.
- * Why: Used to display a compact avatar when the user does not have a profile image.
- */
-const getInitials = (name?: string | null) => {
-  if (!name) return 'ST';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+export function Sidebar({
+  isCollapsed: controlledIsCollapsed,
+  onToggleCollapse,
+  isMobileOpen = false,
+  onMobileClose,
+  className = '',
+}: SidebarProps) {
+  const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
+  const isCollapsed = controlledIsCollapsed ?? internalIsCollapsed;
 
-export function Sidebar({ isMobileOpen = false, onMobileClose, className = '' }: SidebarProps) {
+  const handleToggle = () => {
+    if (onToggleCollapse) {
+      onToggleCollapse();
+    } else {
+      setInternalIsCollapsed(!internalIsCollapsed);
+    }
+  };
+
   const pathname = usePathname();
-  const { user, loading, logout } = useAuthContext();
+  const { logout, user } = useAuthContext();
 
-  // Resolve the user's display name from the best available source
-  const [displayName, setDisplayName] = useState('Student');
+  const [profileName, setProfileName] = useState<string>('Student');
+  const [userStatus, setUserStatus] = useState<string>('ACTIVE');
 
   useEffect(() => {
-    if (user?.fullName) {
-      setDisplayName(user.fullName);
-      return;
-    }
-    const resolveDisplayName = async () => {
+    let cancelled = false;
+    const fetchUser = async () => {
       try {
+        if (user?.fullName) {
+          setProfileName(user.fullName);
+          setProfileRole(user.studyYear ? `Year ${user.studyYear} Student` : 'Medical Student');
+          if (user.status) setUserStatus(user.status);
+          return;
+        }
+
         const supabase = createClient();
         const { data: { user: sbUser } } = await supabase.auth.getUser();
+        if (cancelled) return;
+
         const name =
           sbUser?.user_metadata?.full_name ??
           sbUser?.user_metadata?.name ??
-          null;
-        if (name) {
-          setDisplayName(name);
-          return;
-        }
+          (sbUser?.email ? sbUser.email.split('@')[0] : null) ??
+          'Student';
+
+        setProfileName(name);
+        setProfileRole('Medical Student');
+
         if (sbUser?.id) {
-          const { data } = await supabase
+          const { data: profile } = await supabase
             .from('users')
-            .select('full_name')
+            .select('status')
             .eq('id', sbUser.id)
             .single();
-          if (data?.full_name) {
-            setDisplayName(data.full_name);
+          if (profile?.status && !cancelled) {
+            setUserStatus(profile.status);
           }
         }
       } catch {
-        // Silently ignore; UI falls back to "Student"
+        // Fallback defaults
       }
     };
-    resolveDisplayName();
+    fetchUser();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
-  // Show a loading skeleton while auth context is initializing
-  if (loading) {
-    return (
-      <aside className={`fixed inset-y-0 left-0 z-50 flex h-screen w-full max-w-xs flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0 pb-12 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} ${className}`}>
-        <div className="flex items-center justify-between border-b border-gray-200 px-3 py-4 lg:hidden">
-          <p className="text-sm font-bold text-gray-900">Menu</p>
-          <button type="button" onClick={onMobileClose} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="mb-4 flex items-center gap-3 px-3 py-6">
-          <div className="h-10 w-10 animate-pulse rounded-xl bg-muted" />
-          <div className="min-w-0 space-y-1">
-            <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-            <div className="h-2.5 w-16 animate-pulse rounded bg-muted" />
-          </div>
-        </div>
-        <nav className="flex-1 space-y-1">
-          {NAV_LINKS.map(({ href, label, Icon }) => (
-            <Link key={href} href={href} prefetch={false} className="flex min-h-[44px] items-center gap-3 rounded-lg p-3 text-sm font-semibold text-foreground/70 transition-all duration-200 hover:bg-muted hover:text-foreground">
-              <Icon size={18} />
-              {label}
-            </Link>
-          ))}
-        </nav>
-        <div className="space-y-1 border-t border-border px-2 py-3">
-          <button type="button" onClick={() => logout()} className="flex w-full min-h-[44px] items-center gap-3 rounded-lg p-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-muted hover:text-foreground cursor-pointer">
-            <LogOut size={18} /> Log Out
-          </button>
-        </div>
-      </aside>
-    );
-  }
+  const isActive = (href: string) => pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
 
-  const isAdmin = user?.role === 'ADMIN';
-  const learnifyEnabled = user?.learnifyEnabled ?? false;
-  const doctorsQuizzEnabled = user?.doctorsQuizzEnabled ?? false;
-  const isApproved = isAdmin || learnifyEnabled || doctorsQuizzEnabled;
+  const getInitials = (name: string) => {
+    if (!name || name === 'Student') return 'ST';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
-  const firstName = displayName.split(' ')[0];
-  const initials = getInitials(displayName);
-  const displaySub = isAdmin ? 'Administrator' : isApproved ? (user?.studyYear ? `Year ${user.studyYear}` : 'Active') : 'Pending Approval';
+  const initials = getInitials(profileName);
+  const isInactive = userStatus === 'INACTIVE';
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 flex h-screen w-full max-w-xs flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0 pb-12 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} ${className}`}>
-      <div className="flex items-center justify-between border-b border-gray-200 px-3 py-4 lg:hidden">
-        <p className="text-sm font-bold text-gray-900">Menu</p>
-        {onMobileClose && (
-          <button type="button" onClick={onMobileClose} aria-label="Close menu" className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100">
-            <X className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      {/* User Widget */}
-      <div className="flex items-center gap-3 px-3 py-6 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-black text-lg select-none">
-          {initials}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-foreground truncate">{firstName}</p>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{displaySub}</p>
-        </div>
-      </div>
-
-      {/* Navigation Links */}
-      <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
-        {NAV_LINKS.map(({ href, label, Icon, requiresLearnify, requiresDoctorsQuizz }) => {
-          const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
-          const requiresAnyEntitlement = requiresLearnify || requiresDoctorsQuizz;
-          const hasEntitlementAccess = (requiresLearnify && learnifyEnabled) || (requiresDoctorsQuizz && doctorsQuizzEnabled);
-          const hasAccess = isAdmin || !requiresAnyEntitlement || hasEntitlementAccess;
-
-          if (!hasAccess) {
-            return (
-              <div key={href} className="flex min-h-[44px] items-center justify-between gap-3 rounded-lg p-3 text-sm font-semibold text-muted-foreground/50 cursor-not-allowed" title="Pending Admin Approval" aria-disabled="true">
-                <div className="flex items-center gap-3">
-                  <Icon size={18} className="opacity-50" />
-                  <span>{label}</span>
-                </div>
-                <Lock size={14} className="opacity-50" />
+    <aside
+      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-[#e4e6ef] bg-[#fbfbfd] font-sans text-[#191c1e] antialiased transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-[88px]' : 'w-64'
+      } ${
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      } ${className}`}
+    >
+      {/* Header Section */}
+      <div className={`flex flex-col gap-4 ${isCollapsed ? 'px-2 py-5 items-center' : 'p-5'}`}>
+        <div className={`flex items-center w-full ${isCollapsed ? 'flex-col gap-3 justify-center' : 'justify-between'}`}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#3525cd] text-white shadow-sm shadow-[#3525cd]/25">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+            {!isCollapsed && (
+              <div className="flex flex-col whitespace-nowrap opacity-100 transition-opacity duration-300">
+                <span className="text-lg font-extrabold leading-none tracking-tight text-[#191c1e]">
+                  Learnify
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#696778]">
+                  Student Portal
+                </span>
               </div>
-            );
-          }
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="rounded-lg p-2 text-[#5b5a68] transition-colors hover:bg-gray-100 hover:text-[#191c1e]"
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
 
-          return (
-            <Link
-              key={href}
-              href={href}
-              prefetch={false}
-              onClick={onMobileClose}
-              className={`flex min-h-[44px] items-center gap-3 rounded-lg p-3 text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-foreground/70 hover:bg-muted hover:text-foreground'}`}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          );
-        })}
+      {/* Navigation List */}
+      <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
+        <ul className="space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            const isAllowedWhenInactive = item.href === '/dashboard/profile' || item.href === '/settings';
+            const isDisabled = isInactive && !isAllowedWhenInactive;
+
+            if (isDisabled) {
+              return (
+                <li key={item.href}>
+                  <div
+                    title="Your account is currently inactive. Contact your administrator."
+                    className={`group relative flex min-h-11 cursor-not-allowed items-center gap-3 rounded-xl py-2.5 text-sm font-semibold opacity-40 grayscale select-none ${
+                      isCollapsed ? 'justify-center px-0' : 'px-3.5'
+                    } text-gray-400`}
+                  >
+                    <Icon className="h-[18px] w-[18px] flex-shrink-0 text-gray-400" />
+                    {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                  </div>
+                </li>
+              );
+            }
+
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  onClick={onMobileClose}
+                  title={isCollapsed ? item.label : undefined}
+                  className={`group relative flex min-h-11 items-center gap-3 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 ${
+                    isCollapsed ? 'justify-center px-0' : 'px-3.5'
+                  } ${
+                    active
+                      ? 'border border-[#3525cd]/15 bg-[#3525cd]/10 text-[#3525cd] shadow-sm shadow-[#3525cd]/5'
+                      : 'text-[#5b5a68] hover:bg-white hover:text-[#191c1e] hover:shadow-sm'
+                  }`}
+                >
+                  {active && !isCollapsed && (
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-[#3525cd]"></div>
+                  )}
+                  <Icon
+                    className={`h-[18px] w-[18px] flex-shrink-0 ${
+                      active ? 'text-[#3525cd]' : 'text-[#8d8b99] group-hover:text-[#191c1e]'
+                    }`}
+                  />
+                  {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
 
-      {/* Bottom Actions */}
-      <div className="space-y-1 border-t border-border px-2 py-3">
-        <Link href="/settings" prefetch={false} className="flex min-h-[44px] items-center gap-3 rounded-lg p-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-muted hover:text-foreground">
-          <Settings size={18} /> Settings
-        </Link>
-        {/* Ghost‑style logout button matching sidebar links */}
-        <button type="button" onClick={() => logout()} className="flex w-full min-h-[44px] items-center gap-3 rounded-lg p-3 text-sm font-semibold text-foreground/70 transition-colors hover:bg-muted hover:text-foreground cursor-pointer">
-          <LogOut size={18} /> Log Out
-        </button>
+      {/* Footer Section */}
+      <div className={`border-t border-[#e4e6ef] ${isCollapsed ? 'p-2' : 'p-4'}`}>
+        <div
+          className={`flex items-center gap-3 rounded-2xl border border-[#e4e6ef] bg-white shadow-sm ${
+            isCollapsed ? 'justify-center border-0 bg-transparent p-0 shadow-none' : 'p-2.5'
+          }`}
+        >
+          <div className="relative flex-shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e6ef] bg-[#f3f4f6] font-bold text-[#3525cd]">
+              {initials}
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500"></span>
+          </div>
+
+          {!isCollapsed && (
+            <>
+              <div className="flex flex-1 flex-col min-w-0">
+                <span className="truncate text-sm font-bold text-[#191c1e]">
+                  {profileName}
+                </span>
+                <span className="truncate text-[11px] font-medium text-[#696778]">
+                  {profileRole}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                aria-label="Logout"
+                className="rounded-lg p-2 text-[#5b5a68] transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </aside>
   );
 }
+
+export default Sidebar;
+

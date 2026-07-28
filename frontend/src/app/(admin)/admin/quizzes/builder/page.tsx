@@ -6,7 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import { Save, AlertCircle, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import apiClient, { quizApi } from '@/lib/api';
+import { createQuiz, addQuestionsToQuiz } from '@/app/actions/quizAdminActions';
+import { quizApi } from '@/lib/api';
 
 import { QuizSidebar } from '@/components/admin/quiz/QuizSidebar';
 import { QuestionEditor } from '@/components/admin/quiz/QuestionEditor';
@@ -67,65 +68,80 @@ export default function QuizBuilderPage() {
     name: 'questions',
   });
 
+  /**
+   * Maps the rich discriminated-union form state into the flat DB column
+   * structure expected by the addQuestionsToQuiz server action.
+   *
+   * - SINGLE_CHOICE  → options stored in option_a..d, correct index in correct_option & correct_answer JSONB
+   * - TRUE_FALSE      → correct boolean stored in correct_answer JSONB
+   * - MULTIPLE_SELECT → options in option_a..d, correct indices in correct_answer JSONB
+   * - MATCHING_PAIRS  → pairs stored in content JSONB
+   */
+  function mapQuestionToDbRow(q: QuizBuilderFormValues['questions'][number]) {
+    const base = {
+      type: q.type,
+      question_text: q.questionText,
+      content: {} as Record<string, unknown>,
+      correct_answer: {} as Record<string, unknown>,
+      points: 1,
+      option_a: null as string | null,
+      option_b: null as string | null,
+      option_c: null as string | null,
+      option_d: null as string | null,
+      correct_option: null as string | null,
+      explanation: q.explanation ?? null,
+    };
+
+    if (q.type === 'SINGLE_CHOICE') {
+      const labels = ['A', 'B', 'C', 'D'] as const;
+      q.options.forEach((opt, i) => {
+        if (i < 4) {
+          (base as Record<string, unknown>)[`option_${labels[i].toLowerCase()}`] = opt;
+        }
+      });
+      base.correct_option = labels[q.correctOptionIndex] ?? null;
+      base.correct_answer = { correctOptionIndex: q.correctOptionIndex };
+      base.content = { options: q.options };
+    } else if (q.type === 'TRUE_FALSE') {
+      base.correct_answer = { value: q.correctAnswer };
+    } else if (q.type === 'MULTIPLE_SELECT') {
+      const labels = ['A', 'B', 'C', 'D'] as const;
+      q.options.forEach((opt, i) => {
+        if (i < 4) {
+          (base as Record<string, unknown>)[`option_${labels[i].toLowerCase()}`] = opt;
+        }
+      });
+      base.correct_answer = { correctOptionIndices: q.correctOptionIndices };
+      base.content = { options: q.options };
+    } else if (q.type === 'MATCHING_PAIRS') {
+      base.content = { pairs: q.pairs };
+      base.correct_answer = { pairs: q.pairs };
+    }
+
+    return base;
+  }
+
   const onSubmit: SubmitHandler<QuizBuilderFormValues> = async (data) => {
     setIsSaving(true);
     try {
-      // Simulate backend call or directly submit
-      const payload = {
-        title: data.title,
+      // Step 1 – Create the quiz shell and retrieve its new ID
+      const newQuiz = await createQuiz({
         categoryId: data.categoryId,
-        durationSec: Number(data.durationSec),
-        questions: data.questions.map((q) => {
-          // Normalize True/False correct answer
-          if (q.type === 'TRUE_FALSE') {
-            return {
-              type: q.type,
-              questionText: q.questionText,
-              correctAnswer: q.correctAnswer,
-              explanation: q.explanation,
-            };
-          }
-          // Normalize Matching Pairs
-          if (q.type === 'MATCHING_PAIRS') {
-            return {
-              type: q.type,
-              questionText: q.questionText,
-              pairs: q.pairs,
-              explanation: q.explanation,
-            };
-          }
-          // Normalize Single Choice
-          if (q.type === 'SINGLE_CHOICE') {
-            return {
-              type: q.type,
-              questionText: q.questionText,
-              options: q.options,
-              correctOptionIndex: q.correctOptionIndex,
-              explanation: q.explanation,
-            };
-          }
-          // Normalize Multiple Select
-          return {
-            type: q.type,
-            questionText: q.questionText,
-            options: q.options,
-            correctOptionIndices: q.correctOptionIndices,
-            explanation: q.explanation,
-          };
-        }),
-      };
+        title: data.title,
+        duration_sec: Number(data.durationSec),
+      });
 
-      // Call API
-      const res = await apiClient.post('/quiz/quizzes', payload);
-      if (res.data?.success) {
-        toast.success('Quiz created successfully!');
-        form.reset();
-        setActiveIndex(null);
-      } else {
-        toast.error(res.data?.message || 'Failed to save quiz.');
-      }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Error occurred while saving the quiz.');
+      // Step 2 – Bulk-insert questions linked to the new quiz
+      const dbRows = data.questions.map(mapQuestionToDbRow);
+      await addQuestionsToQuiz(newQuiz.id, dbRows);
+
+      toast.success('Quiz created successfully!');
+      form.reset();
+      setActiveIndex(null);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error occurred while saving the quiz.';
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }

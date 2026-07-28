@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Lock, ShieldCheck, UserCog, UserMinus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ShieldCheck, UserCog, UserMinus, X } from 'lucide-react';
 
 type UserRole = 'STUDENT' | 'ADMIN';
-type UserStatus = 'ACTIVE' | 'DEACTIVATED';
+type UserStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
 
 export type ManagedUser = {
   id: string;
@@ -12,8 +12,6 @@ export type ManagedUser = {
   email: string;
   role: UserRole;
   status: UserStatus;
-  learnifyEnabled: boolean;
-  doctorsQuizzEnabled: boolean;
 };
 
 type ManageUserModalProps = {
@@ -26,8 +24,6 @@ type ManageUserModalProps = {
     changes: {
       role: UserRole;
       status: UserStatus;
-      learnifyEnabled: boolean;
-      doctorsQuizzEnabled: boolean;
     }
   ) => Promise<void>;
   onResetPassword: (userId: string) => Promise<void>;
@@ -35,6 +31,7 @@ type ManageUserModalProps = {
 };
 
 const ROLE_OPTIONS: UserRole[] = ['STUDENT', 'ADMIN'];
+const STATUS_OPTIONS: UserStatus[] = ['ACTIVE', 'INACTIVE', 'PENDING'];
 
 export function ManageUserModal({
   isOpen,
@@ -48,16 +45,11 @@ export function ManageUserModal({
   const [role, setRole] = useState<UserRole>('STUDENT');
   const [status, setStatus] = useState<UserStatus>('ACTIVE');
   const [isDoubleConfirm, setIsDoubleConfirm] = useState(false);
-  const [accessState, setAccessState] = useState({ learnifyEnabled: false, doctorsQuizzEnabled: false });
 
   useEffect(() => {
     if (!isOpen || !user) return;
     setRole(user.role);
     setStatus(user.status);
-    setAccessState({
-      learnifyEnabled: user.learnifyEnabled,
-      doctorsQuizzEnabled: user.doctorsQuizzEnabled,
-    });
     setIsDoubleConfirm(false);
   }, [isOpen, user]);
 
@@ -69,8 +61,6 @@ export function ManageUserModal({
     return () => window.removeEventListener('keydown', onEscClose);
   }, [isOpen, isSaving, onClose]);
 
-  const nextStatus = useMemo<UserStatus>(() => (status === 'ACTIVE' ? 'DEACTIVATED' : 'ACTIVE'), [status]);
-
   if (!isOpen || !user) return null;
 
   const handleNuclearAction = async () => {
@@ -81,35 +71,11 @@ export function ManageUserModal({
     await onDeleteAccount(user.id);
   };
 
-  const handleToggleStatus = () => {
-    const next = nextStatus;
-    setStatus(next);
-    setAccessState({
-      learnifyEnabled: next === 'ACTIVE',
-      doctorsQuizzEnabled: next === 'ACTIVE',
-    });
-  };
-
-  const handleToggleAccess = (field: 'learnifyEnabled' | 'doctorsQuizzEnabled') => {
-    const nextAccess = { ...accessState, [field]: !accessState[field] };
-    setAccessState(nextAccess);
-    setStatus(nextAccess.learnifyEnabled || nextAccess.doctorsQuizzEnabled ? 'ACTIVE' : 'DEACTIVATED');
-  };
-
-  const hasPendingChanges =
-    role !== user.role ||
-    status !== user.status ||
-    accessState.learnifyEnabled !== user.learnifyEnabled ||
-    accessState.doctorsQuizzEnabled !== user.doctorsQuizzEnabled;
+  const hasPendingChanges = role !== user.role || status !== user.status;
 
   const handleSaveChanges = async () => {
     if (!hasPendingChanges) return;
-    await onSaveChanges(user.id, {
-      role,
-      status,
-      learnifyEnabled: accessState.learnifyEnabled,
-      doctorsQuizzEnabled: accessState.doctorsQuizzEnabled,
-    });
+    await onSaveChanges(user.id, { role, status });
   };
 
   return (
@@ -129,7 +95,7 @@ export function ManageUserModal({
             <h2 id="manage-user-title" className="text-xl font-semibold text-gray-900">
               Manage User Access
             </h2>
-            <p className="mt-1 text-sm text-gray-500">{user.fullName} - {user.email}</p>
+            <p className="mt-1 text-sm text-gray-500">{user.fullName} — {user.email}</p>
           </div>
           <button
             type="button"
@@ -143,138 +109,87 @@ export function ManageUserModal({
         </div>
 
         <div className="space-y-5">
+          {/* Role Switching */}
           <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2 text-gray-700">
               <UserCog size={16} />
-              <h3 className="text-sm font-medium">Role Switching</h3>
+              <h3 className="text-sm font-medium">Role Assignment</h3>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as UserRole)}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20"
-                aria-label="Select user role"
-                disabled={isSaving}
-              >
-                {ROLE_OPTIONS.map((roleOption) => (
-                  <option key={roleOption} value={roleOption}>
-                    {roleOption}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as UserRole)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20"
+              aria-label="Select user role"
+              disabled={isSaving}
+            >
+              {ROLE_OPTIONS.map((roleOption) => (
+                <option key={roleOption} value={roleOption}>
+                  {roleOption}
+                </option>
+              ))}
+            </select>
           </section>
 
+          {/* Status Governance */}
           <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
             <div className="mb-3 flex items-center gap-2 text-gray-700">
               <ShieldCheck size={16} />
-              <h3 className="text-sm font-medium">Account Restriction</h3>
+              <h3 className="text-sm font-medium">Account Status Governance</h3>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleStatus}
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as UserStatus)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20"
+              aria-label="Select user status"
               disabled={isSaving}
-              className={`w-full rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 ${
-                nextStatus === 'DEACTIVATED' ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'
-              }`}
             >
-              {nextStatus === 'DEACTIVATED' ? 'Deactivate User' : 'Reactivate User'}
-            </button>
+              {STATUS_OPTIONS.map((statusOpt) => (
+                <option key={statusOpt} value={statusOpt}>
+                  {statusOpt}
+                </option>
+              ))}
+            </select>
           </section>
 
-          <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-            <div className="mb-3 flex items-center gap-2 text-gray-700">
-              <Lock size={16} />
-              <h3 className="text-sm font-medium">Platform Access Control</h3>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Learnify Access</p>
-                  <p className="text-xs text-gray-500">Enable or disable Learnify platform access</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => handleToggleAccess('learnifyEnabled')}
-                  className={`relative h-6 w-12 rounded-full transition ${accessState.learnifyEnabled ? 'bg-purple-600' : 'bg-gray-300'}`}
-                  aria-pressed={accessState.learnifyEnabled}
-                  aria-label="Toggle Learnify Access"
-                >
-                  <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${accessState.learnifyEnabled ? 'left-7' : 'left-1'}`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">DoctorsQuizz Access</p>
-                  <p className="text-xs text-gray-500">Enable or disable DoctorsQuizz platform access</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={isSaving}
-                  onClick={() => handleToggleAccess('doctorsQuizzEnabled')}
-                  className={`relative h-6 w-12 rounded-full transition ${accessState.doctorsQuizzEnabled ? 'bg-purple-600' : 'bg-gray-300'}`}
-                  aria-pressed={accessState.doctorsQuizzEnabled}
-                  aria-label="Toggle DoctorsQuizz Access"
-                >
-                  <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${accessState.doctorsQuizzEnabled ? 'left-7' : 'left-1'}`}
-                  />
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <div className="flex justify-end gap-3">
+          {/* Destructive Actions */}
+          <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 space-y-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => onResetPassword(user.id)}
               disabled={isSaving}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed"
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed"
             >
-              Cancel
+              Send Password Reset Email
             </button>
             <button
               type="button"
-              onClick={handleSaveChanges}
-              disabled={isSaving || !hasPendingChanges}
-              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+              onClick={handleNuclearAction}
+              disabled={isSaving}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed"
             >
-              Save Changes
-            </button>
-          </div>
-
-          <section className="rounded-xl border border-red-200 bg-red-50 p-4">
-            <div className="mb-3 flex items-center gap-2 text-red-700">
               <UserMinus size={16} />
-              <h3 className="text-sm font-medium">Critical Actions</h3>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => onResetPassword(user.id)}
-                disabled={isSaving}
-                className="w-full rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed"
-              >
-                Reset Password
-              </button>
-              <button
-                type="button"
-                onClick={handleNuclearAction}
-                disabled={isSaving}
-                className="w-full rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                {isDoubleConfirm ? 'Confirm Delete Account' : 'Delete Account'}
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-red-500">
-              Deletion requires double confirmation to avoid irreversible mistakes.
-            </p>
+              {isDoubleConfirm ? 'Click to Confirm Permanent Deletion' : 'Delete Account'}
+            </button>
           </section>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSaving}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveChanges}
+            disabled={!hasPendingChanges || isSaving}
+            className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+          >
+            {isSaving ? 'Saving…' : 'Save Changes'}
+          </button>
         </div>
       </div>
     </div>

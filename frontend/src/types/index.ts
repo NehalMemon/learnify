@@ -4,9 +4,12 @@
  * TypeScript types and interfaces used across the application.
  */
 
+export * from './types_db';
+
 // ─── User & Auth ───────────────────────────────────────────────
 
 export type UserRole = 'STUDENT' | 'ADMIN';
+export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
 
 export interface User {
   id: string;
@@ -14,14 +17,30 @@ export interface User {
   fullName: string;
   phone?: string | null;
   role: UserRole;
+  status: UserStatus;
+  credits: number;
   hasSeenQuizDisclaimer?: boolean;
   universityProgram?: string | null;
   studyYear?: number;
-  learnifyEnabled: boolean;
-  doctorsQuizzEnabled: boolean;
   accessExpiresAt?: string | Date | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type CreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface CreditRequest {
+  id: string;
+  userId: string;
+  amount: number;
+  status: CreditRequestStatus;
+  reason?: string | null;
+  proofImageUrl?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: User;
 }
 
 export interface AuthTokens {

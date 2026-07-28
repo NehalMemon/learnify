@@ -5,7 +5,7 @@ import { BrainCircuit, ArrowRight, Hash } from 'lucide-react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface AdminQuiz {
   id: string;
@@ -15,10 +15,10 @@ interface AdminQuiz {
   _count?: { questions?: number };
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
- * QuizCatalog — sidebar panel showing the 4 most recently created quizzes.
+ * QuizCatalog â€” sidebar panel showing the 4 most recently created quizzes.
  * Mirrors the structure of TopCourses for visual consistency.
  * Fetches from GET /api/v1/admin/quizzes with limit=4.
  */
@@ -28,7 +28,7 @@ export function QuizCatalog() {
 
   useEffect(() => {
     let cancelled = false;
-    adminApi.listQuizzes({ limit: 4 } as Record<string, unknown>)
+    adminApi.listQuizzes({ limit: 4 })
       .then((res) => {
         if (cancelled) return;
         // Handles both { data: Quiz[] } and { data: { quizzes: Quiz[], ... } } shapes
@@ -36,7 +36,7 @@ export function QuizCatalog() {
         const list: AdminQuiz[] = Array.isArray(raw) ? raw : (raw?.quizzes ?? []);
         setQuizzes(list.slice(0, 4));
       })
-      .catch(() => {/* graceful degradation — empty state shown */})
+      .catch(() => {/* graceful degradation â€” empty state shown */})
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
@@ -62,7 +62,7 @@ export function QuizCatalog() {
       <ul className="divide-y divide-gray-100">
         {loading && (
           <li className="px-6 py-8 text-center text-sm text-gray-400 animate-pulse">
-            Loading quizzes…
+            Loading quizzesâ€¦
           </li>
         )}
         {!loading && quizzes.length === 0 && (

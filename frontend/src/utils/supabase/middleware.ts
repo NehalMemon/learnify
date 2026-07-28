@@ -15,22 +15,33 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const cookieOptions = {
+              ...options,
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+            }
+            request.cookies.set(name, value)
+            supabaseResponse = NextResponse.next({
+              request,
+            })
+            supabaseResponse.cookies.set(name, value, cookieOptions)
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
         },
       },
     }
   )
 
-  // Why: getUser() calls the Supabase Auth API to validate the JWT.
-  // If Supabase is unreachable (ECONNRESET, DNS failure, timeout), the
-  // unhandled rejection crashes the middleware, killing every request —
-  // including server action POSTs — before they reach route handlers.
+  // Helper to copy any refreshed cookies to redirect responses
+  const createRedirectResponse = (url: URL) => {
+    const redirectResponse = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirectResponse.cookies.set(cookie.name, cookie.value)
+    })
+    return redirectResponse
+  }
+
+  // Why: getUser() calls the Supabase Auth API to validate the JWT and automatically exchange expired access tokens using the refresh token.
   let user = null
   try {
     const { data } = await supabase.auth.getUser()
@@ -42,38 +53,44 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   
-  // Protect /dashboard, /admin, and private quiz routes
+  // Protect /admin, /student, /dashboard, /quiz, /my-courses, /workshops routes
   const isProtectedRoute = 
-    pathname.startsWith('/dashboard') || 
     pathname.startsWith('/admin') || 
-    pathname.startsWith('/quiz')
+    pathname.startsWith('/student') || 
+    pathname.startsWith('/dashboard') || 
+    pathname.startsWith('/quiz') || 
+    pathname.startsWith('/my-courses') || 
+    pathname.startsWith('/workshops')
 
   if (isProtectedRoute && !user) {
-    // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    return NextResponse.redirect(url)
+    return createRedirectResponse(url)
   }
 
   // Edge RBAC for admin routes
-  if (pathname.startsWith('/admin')) {
-    if (user?.app_metadata?.role !== 'ADMIN') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard' // bounce back to standard dashboard
-      return NextResponse.redirect(url)
+  if (pathname.startsWith('/admin') && user) {
+    const role = user.app_metadata?.role || user.user_metadata?.role
+    if (role !== 'ADMIN') {
+      const url = new URL('/student/dashboard', request.url)
+      return createRedirectResponse(url)
     }
   }
 
-  const isPublicPath = pathname === '/login' || pathname === '/register'
-  if (isPublicPath && user) {
-    const url = request.nextUrl.clone()
-    if (user.app_metadata?.role === 'ADMIN') {
-      url.pathname = '/admin/dashboard'
-    } else {
-      url.pathname = '/dashboard'
-    }
-    return NextResponse.redirect(url)
+  // Instantly redirect authenticated users visiting root (/) or auth pages (/login, /signup, /register)
+  const isPublicOrAuthPage = 
+    pathname === '/' || 
+    pathname === '/login' || 
+    pathname === '/signup' || 
+    pathname === '/register'
+
+  if (isPublicOrAuthPage && user) {
+    const role = user.app_metadata?.role || user.user_metadata?.role
+    const targetPath = role === 'ADMIN' ? '/admin/dashboard' : '/student/dashboard'
+    const url = new URL(targetPath, request.url)
+    return createRedirectResponse(url)
   }
 
   return supabaseResponse
 }
+
