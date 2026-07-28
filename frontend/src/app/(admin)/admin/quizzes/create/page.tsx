@@ -1,20 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm, useFieldArray } from "react-hook-form";
 import apiClient from "@/lib/api";
 import { toast } from "react-hot-toast";
+import {
+  getCategoriesWithSubjects,
+  type QuizCategoryWithSubjects,
+  type QuizSubject,
+} from "@/app/actions/taxonomyActions";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
 type QuestionType = "SINGLE_CHOICE" | "TRUE_FALSE" | "MULTIPLE_SELECT" | "MATCHING_PAIRS";
-
-interface Category {
-  id: string;
-  name: string;
-}
 
 /** Single question (editable draft) */
 interface QuestionDraft {
@@ -38,6 +38,7 @@ interface QuizForm {
   title: string;
   description: string;
   categoryId: string;
+  subjectId?: string;
   questions: QuestionDraft[];
 }
 
@@ -101,6 +102,7 @@ export default function CreateQuizPage() {
       title: "",
       description: "",
       categoryId: "",
+      subjectId: "",
       questions: [],
     },
   });
@@ -110,20 +112,27 @@ export default function CreateQuizPage() {
     name: "questions",
   });
 
-  /* ── Categories ──────────────────────────────────────────────── */
-  const [categories, setCategories] = useState<Category[]>([]);
+  /* ── Taxonomy Categories & Subjects ──────────────────────────── */
+  const [categories, setCategories] = useState<QuizCategoryWithSubjects[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient
-      .get<{ success: boolean; data: Category[] }>("/quiz/categories")
-      .then((res) => setCategories(res.data.data))
+    getCategoriesWithSubjects()
+      .then((data) => setCategories(data))
       .catch(() => setLoadError("Failed to load categories. Please refresh."));
   }, []);
 
   /* ── Watched values ──────────────────────────────────────────── */
   const watchedTitle = watch("title");
+  const watchedCategoryId = watch("categoryId");
   const watchedQuestions = watch("questions");
+
+  // Dynamically filter subjects for the selected category
+  const availableSubjects = useMemo(() => {
+    if (!watchedCategoryId) return [];
+    const cat = categories.find((c) => c.id === watchedCategoryId);
+    return cat ? cat.subjects : [];
+  }, [categories, watchedCategoryId]);
 
   /* ── Step 1 → Step 2 transition ──────────────────────────────── */
   const advanceToStep2 = () => {
@@ -153,6 +162,7 @@ export default function CreateQuizPage() {
         title: formData.title,
         description: formData.description,
         categoryId: formData.categoryId,
+        subjectId: formData.subjectId || null,
         durationSec: 60 * 60,
         questions: formData.questions,
       };
@@ -276,36 +286,70 @@ export default function CreateQuizPage() {
           />
         </div>
 
-        {/* Category */}
-        <div className="mb-8">
-          <label
-            htmlFor="quiz-category"
-            className="mb-1.5 block text-sm font-medium text-gray-700"
-          >
-            Category <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="quiz-category"
-            {...register("categoryId", { required: "Category is required" })}
-            className={`w-full rounded-lg border px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 ${
-              errors.categoryId ? "border-red-400" : "border-gray-300"
-            }`}
-          >
-            <option value="">Select category…</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
+        {/* Category & Subject Grid */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 mb-8">
+          <div>
+            <label
+              htmlFor="quiz-category"
+              className="mb-1.5 block text-sm font-medium text-gray-700"
+            >
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="quiz-category"
+              {...register("categoryId", {
+                required: "Category is required",
+                onChange: () => setValue("subjectId", ""),
+              })}
+              className={`w-full rounded-xl border bg-[#f7f7fb] px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 ${
+                errors.categoryId ? "border-red-400" : "border-gray-300"
+              }`}
+            >
+              <option value="">Select category…</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.categoryId.message}
+              </p>
+            )}
+            {loadError && (
+              <p className="mt-1 text-sm text-red-600">{loadError}</p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="quiz-subject"
+              className="mb-1.5 block text-sm font-medium text-gray-700"
+            >
+              Subject{" "}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <select
+              id="quiz-subject"
+              {...register("subjectId")}
+              disabled={!watchedCategoryId || availableSubjects.length === 0}
+              className="w-full rounded-xl border border-gray-300 bg-[#f7f7fb] px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-purple-500 focus:bg-white focus:ring-2 focus:ring-purple-500/20 disabled:opacity-50"
+            >
+              <option value="">
+                {!watchedCategoryId
+                  ? "Select a category first"
+                  : availableSubjects.length === 0
+                  ? "No subjects in category"
+                  : "Select subject…"}
               </option>
-            ))}
-          </select>
-          {errors.categoryId && (
-            <p className="mt-1 text-sm text-red-600">
-              {errors.categoryId.message}
-            </p>
-          )}
-          {loadError && (
-            <p className="mt-1 text-sm text-red-600">{loadError}</p>
-          )}
+              {availableSubjects.map((subj) => (
+                <option key={subj.id} value={subj.id}>
+                  {subj.name} {subj.code ? `(${subj.code})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Next button */}

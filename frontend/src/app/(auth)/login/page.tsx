@@ -1,49 +1,66 @@
-'use client';
-
 import Link from 'next/link';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Star } from 'lucide-react';
 import { LoginForm } from '@/components/auth/LoginForm';
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-gray-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link href="/" className="flex justify-center">
-          <svg
-            className="h-12 w-12 text-purple-600"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-            />
-          </svg>
+    <main className="flex h-screen w-full overflow-hidden bg-white font-sans text-[#191c1e] antialiased">
+      <section className="relative flex h-full w-full items-center justify-center overflow-hidden px-6 py-5 md:w-[45%] lg:w-[40%] lg:px-10">
+        <Link href="/" className="absolute left-6 top-5 flex items-center gap-2 md:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3525cd] text-white">
+            <Star className="h-4 w-4 fill-current" aria-hidden="true" />
+          </span>
+          <span className="text-lg font-extrabold tracking-tight text-[#3525cd]">Learnify</span>
         </Link>
-        <h2 className="mt-6 text-center text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
-          Sign in to your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
-          <Link href="/register" className="font-medium text-purple-600 hover:text-purple-700">
-            create a new account
-          </Link>
-        </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <Card>
-          <CardHeader>
-            <h3 className="text-lg font-medium text-gray-900">Login</h3>
-          </CardHeader>
-          <CardContent>
-            <LoginForm />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        <div className="w-full max-w-sm">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold tracking-tight text-[#191c1e]">
+              Welcome back
+            </h1>
+            <p className="mt-1.5 text-sm leading-6 text-[#5b5a68]">
+              Sign in to continue your learning journey.
+            </p>
+          </div>
+
+          <LoginForm />
+        </div>
+      </section>
+
+      <section
+        className="relative hidden h-full items-center justify-center overflow-hidden p-12 md:flex md:w-[55%] lg:w-[60%] lg:p-16"
+        style={{
+          backgroundColor: '#4f46e5',
+          backgroundImage:
+            'radial-gradient(at 0% 0%, #3525cd 0px, transparent 50%), radial-gradient(at 100% 0%, #6cf8bb 0px, transparent 50%), radial-gradient(at 100% 100%, #4f46e5 0px, transparent 50%), radial-gradient(at 0% 100%, #c3c0ff 0px, transparent 50%)',
+        }}
+      >
+        <div className="absolute inset-0 bg-black/5 backdrop-blur-[1px]" aria-hidden="true" />
+
+        <div className="relative z-10 max-w-lg text-center text-white">
+          <Link href="/" className="mb-10 flex items-center justify-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/30 bg-white/20 text-white shadow-xl backdrop-blur-md">
+              <Star className="h-6 w-6 fill-current" aria-hidden="true" />
+            </span>
+            <span className="text-4xl font-extrabold tracking-tight">Learnify</span>
+          </Link>
+
+          <h2 className="text-4xl font-bold leading-tight tracking-tight lg:text-5xl">
+            Keep momentum on your side.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-lg leading-8 text-white/85">
+            Pick up your courses, review progress insights, and stay connected with your learning ecosystem.
+          </p>
+
+          <div className="absolute -bottom-20 left-1/2 flex -translate-x-1/2 gap-5 opacity-20" aria-hidden="true">
+            <span className="h-3 w-3 rounded-full bg-white" />
+            <span className="h-3 w-3 rounded-full bg-white" />
+            <span className="h-3 w-3 rounded-full bg-white" />
+            <span className="h-3 w-3 rounded-full bg-white" />
+            <span className="h-3 w-3 rounded-full bg-white" />
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

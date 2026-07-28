@@ -38,27 +38,21 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-export const signupSchema = z
-  .object({
-    fullName: z
-      .string()
-      .min(1, 'Full name is required')
-      .min(2, 'Full name must be at least 2 characters'),
-    email: z
-      .string()
-      .min(1, 'Email is required')
-      .email('Enter a valid email address'),
-    phone: z.string().optional(),
-    password: passwordSchema,
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
-    terms: z.boolean().refine((value) => value === true, {
-      message: 'You must accept the terms and conditions',
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
+export const signupSchema = z.object({
+  fullName: z
+    .string()
+    .min(1, 'Full name is required')
+    .min(2, 'Full name must be at least 2 characters'),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Enter a valid email address'),
+  phone: z.string().optional(),
+  password: passwordSchema,
+  terms: z.boolean().refine((value) => value === true, {
+    message: 'You must accept the terms and conditions',
+  }),
+});
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type SignupFormValues = z.infer<typeof signupSchema>;

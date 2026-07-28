@@ -1,0 +1,25 @@
+
+> frontend@0.1.0 dev
+> next dev --port 3001
+
+   ▲ Next.js 15.5.14
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.18.252:3001
+   - Environments: .env.local
+   - Experiments (use with caution):
+     ✓ reactCompiler
+     · optimizePackageImports
+
+ ✓ Starting...
+ ✓ Ready in 12.4s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 1251ms (171 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 15.3s (1220 modules)
+ ✓ Compiled in 1606ms (415 modules)
+ ✓ Compiled in 1664ms (415 modules)
+ ✓ Compiled in 866ms (415 modules)
+ ✓ Compiled in 541ms (415 modules)
+ ✓ Compiled in 670ms (415 modules)
+ ✓ Compiled in 650ms (415 modules)
+ ✓ Compiled in 543ms (415 modules)

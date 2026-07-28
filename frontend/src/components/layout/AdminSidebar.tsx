@@ -1,18 +1,23 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
+  FolderTree,
+  FileEdit,
+  Database,
   Users,
-  BookOpen,
-  Brain,
-  CreditCard,
-  ClipboardList,
-  GraduationCap,
+  Settings,
+  Coins,
+  School,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/AuthProvider';
+import { createClient } from '@/utils/supabase/client';
 
 interface NavItem {
   href: string;
@@ -22,35 +27,134 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/courses', label: 'Courses', icon: BookOpen },
-  { href: '/admin/quizzes', label: 'Quizzes', icon: Brain },
-  { href: '/admin/payments', label: 'Payments', icon: CreditCard },
-  { href: '/admin/logs', label: 'System Logs', icon: ClipboardList },
+  { href: '/admin/requests', label: 'Credit Requests', icon: Coins },
+  { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree },
+  { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
+  { href: '/admin/questions', label: 'Question Bank', icon: Database },
+  { href: '/admin/users', label: 'User Management', icon: Users },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-export const AdminSidebar = ({ className = '', onMobileClose }: { className?: string; onMobileClose?: () => void }) => {
-  const pathname = usePathname();
-  const { logout } = useAuthContext();
+interface AdminSidebarProps {
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+  className?: string;
+}
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+export const AdminSidebar = ({
+  isCollapsed: controlledIsCollapsed,
+  onToggleCollapse,
+  isMobileOpen = false,
+  onMobileClose,
+  className = '',
+}: AdminSidebarProps) => {
+  const [internalIsCollapsed, setInternalIsCollapsed] = useState(false);
+  const isCollapsed = controlledIsCollapsed ?? internalIsCollapsed;
+
+  const handleToggle = () => {
+    if (onToggleCollapse) {
+      onToggleCollapse();
+    } else {
+      setInternalIsCollapsed(!internalIsCollapsed);
+    }
+  };
+
+  const pathname = usePathname();
+  const { logout, user } = useAuthContext();
+
+  const [profileName, setProfileName] = useState<string>('Admin');
+  const [profileRole, setProfileRole] = useState<string>('Administrator');
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUser = async () => {
+      try {
+        if (user?.fullName) {
+          setProfileName(user.fullName);
+          setProfileRole(user.role === 'ADMIN' ? 'Chief Administrator' : user.role || 'Administrator');
+          return;
+        }
+
+        const supabase = createClient();
+        const { data: { user: sbUser } } = await supabase.auth.getUser();
+        if (cancelled) return;
+
+        const name =
+          sbUser?.user_metadata?.full_name ??
+          sbUser?.user_metadata?.name ??
+          (sbUser?.email ? sbUser.email.split('@')[0] : null) ??
+          'Admin';
+
+        setProfileName(name);
+
+        const role =
+          sbUser?.app_metadata?.role ??
+          sbUser?.user_metadata?.role ??
+          'Administrator';
+        setProfileRole(role === 'ADMIN' ? 'Chief Administrator' : role);
+      } catch {
+        // Fallback defaults
+      }
+    };
+    fetchUser();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const isActive = (href: string) => pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href));
+
+  const getInitials = (name: string) => {
+    if (!name || name === 'Admin') return 'AD';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
+  const initials = getInitials(profileName);
 
   return (
-    <aside className={`fixed top-0 left-0 z-40 flex h-screen w-64 flex-col border-r border-gray-200 bg-white ${className}`}>
-      <div className="border-b border-gray-200 p-6">
-        <Link href="/admin/dashboard" className="group flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-purple-700 shadow-sm shadow-purple-600/20 transition-all duration-300 group-hover:shadow-purple-600/30">
-            <GraduationCap className="h-6 w-6 text-white" />
+    <aside
+      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-[#e4e6ef] bg-[#fbfbfd] font-sans text-[#191c1e] antialiased transition-all duration-300 ease-in-out ${
+        isCollapsed ? 'w-[88px]' : 'w-64'
+      } ${
+        isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      } ${className}`}
+    >
+      {/* Header Section */}
+      <div className={`flex flex-col gap-4 ${isCollapsed ? 'px-2 py-5 items-center' : 'p-5'}`}>
+        <div className={`flex items-center w-full ${isCollapsed ? 'flex-col gap-3 justify-center' : 'justify-between'}`}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#3525cd] text-white shadow-sm shadow-[#3525cd]/25">
+              <School className="h-5 w-5" />
+            </div>
+            {!isCollapsed && (
+              <div className="flex flex-col whitespace-nowrap opacity-100 transition-opacity duration-300">
+                <span className="text-lg font-extrabold leading-none tracking-tight text-[#191c1e]">
+                  Learnify
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#696778]">
+                  Management Console
+                </span>
+              </div>
+            )}
           </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-black tracking-tight text-gray-900">Learnify</span>
-            <span className="text-xs font-medium text-gray-500">Management Console</span>
-          </div>
-        </Link>
+          <button
+            type="button"
+            onClick={handleToggle}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="rounded-lg p-2 text-[#5b5a68] transition-colors hover:bg-gray-100 hover:text-[#191c1e]"
+          >
+            {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-6">
-        <ul className="space-y-2">
+      {/* Navigation List */}
+      <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 py-2' : 'px-3 py-2'}`}>
+        <ul className="space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -60,14 +164,24 @@ export const AdminSidebar = ({ className = '', onMobileClose }: { className?: st
                 <Link
                   href={item.href}
                   onClick={onMobileClose}
-                  className={`flex min-h-[44px] items-center gap-3 rounded-lg px-4 py-3 font-medium transition-all duration-200 ${
+                  title={isCollapsed ? item.label : undefined}
+                  className={`group relative flex min-h-11 items-center gap-3 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200 ${
+                    isCollapsed ? 'justify-center px-0' : 'px-3.5'
+                  } ${
                     active
-                      ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/20'
-                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'border border-[#3525cd]/15 bg-[#3525cd]/10 text-[#3525cd] shadow-sm shadow-[#3525cd]/5'
+                      : 'text-[#5b5a68] hover:bg-white hover:text-[#191c1e] hover:shadow-sm'
                   }`}
                 >
-                  <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-gray-400'}`} />
-                  <span>{item.label}</span>
+                  {active && !isCollapsed && (
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-[#3525cd]"></div>
+                  )}
+                  <Icon
+                    className={`h-[18px] w-[18px] flex-shrink-0 ${
+                      active ? 'text-[#3525cd]' : 'text-[#8d8b99] group-hover:text-[#191c1e]'
+                    }`}
+                  />
+                  {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
                 </Link>
               </li>
             );
@@ -75,16 +189,44 @@ export const AdminSidebar = ({ className = '', onMobileClose }: { className?: st
         </ul>
       </nav>
 
-      <div className="space-y-3 border-t border-gray-200 p-4">
-        <button
-          onClick={logout}
-          className="flex min-h-[44px] w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-600 transition-all duration-200 hover:bg-red-50 hover:text-red-700"
+      {/* Footer Section */}
+      <div className={`border-t border-[#e4e6ef] ${isCollapsed ? 'p-2' : 'p-4'}`}>
+        <div
+          className={`flex items-center gap-3 rounded-2xl border border-[#e4e6ef] bg-white shadow-sm ${
+            isCollapsed ? 'justify-center border-0 bg-transparent p-0 shadow-none' : 'p-2.5'
+          }`}
         >
-          <LogOut className="h-5 w-5" />
-          Logout
-        </button>
-        <div className="text-center text-xs text-gray-400">© 2026 Learnify</div>
+          <div className="relative flex-shrink-0">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#e4e6ef] bg-[#f3f4f6] font-bold text-[#3525cd]">
+              {initials}
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-green-500"></span>
+          </div>
+
+          {!isCollapsed && (
+            <>
+              <div className="flex flex-1 flex-col min-w-0">
+                <span className="truncate text-sm font-bold text-[#191c1e]">
+                  {profileName}
+                </span>
+                <span className="truncate text-[11px] font-medium text-[#696778]">
+                  {profileRole}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                aria-label="Logout"
+                className="rounded-lg p-2 text-[#5b5a68] transition-colors hover:bg-red-50 hover:text-red-600"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </aside>
   );
 };
+
+export default AdminSidebar;

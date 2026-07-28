@@ -1,16 +1,17 @@
-// Prisma v7 configuration file.
-// The DATABASE_URL is now managed here, not in schema.prisma.
-// Security Rule §5: Always read credentials from process.env — never hardcode.
+import { defineConfig } from '@prisma/config';
 import 'dotenv/config';
-import { defineConfig } from 'prisma/config';
+import process from 'process';
 
 export default defineConfig({
+  earlyAccess: true,
   schema: 'scripts/prisma/schema.prisma',
-  migrations: {
-    path: 'prisma/migrations',
-    seed: 'ts-node prisma/seed.ts',
-  },
   datasource: {
-    url: process.env['DATABASE_URL'],
+    url: process.env.DIRECT_URL,
+  },
+  migrate: {
+    url: process.env.DIRECT_URL,
+  },
+  client: {
+    url: process.env.DATABASE_URL,
   },
 });

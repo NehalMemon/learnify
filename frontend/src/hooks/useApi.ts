@@ -19,6 +19,7 @@ import {
   adminApi,
   clearAuth,
 } from '@/lib/api';
+import { logout as supabaseLogout } from '@/app/actions/authActions';
 import type {
   User,
   Course,
@@ -118,12 +119,37 @@ export const useAuth = () => {
   const logout = async () => {
     try {
       await authApi.logout();
-    } finally {
-      setUser(null);
-      // Hard navigation flushes the Next.js router cache and forces the
-      // middleware to re-evaluate the request without stale token cookies.
-      window.location.href = '/login';
+    } catch {
+      // Why: Express backend may be unreachable; we still need to clear
+      // the Supabase session and local state below.
     }
+
+    setUser(null);
+
+    // Why: supabaseLogout calls supabase.auth.signOut() on the server,
+    // which invalidates the Supabase session cookies. Without this, the
+    // old admin Supabase JWT survives the logout and the middleware
+    // redirects the next login to /admin/dashboard.
+    // It also calls revalidatePath + redirect('/login') internally.
+    try {
+      await supabaseLogout();
+    } catch {
+      // supabaseLogout calls redirect('/login') which throws NEXT_REDIRECT.
+      // In a programmatic call the throw propagates here — swallow it and
+      // fall through to the hard navigation below.
+    }
+
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Silently ignore browser client signout errors if already cleared
+    }
+
+    // Hard navigation flushes the Next.js router cache and forces the
+    // middleware to re-evaluate the request without stale token cookies.
+    window.location.href = '/login';
   };
 
   const isAuthenticated = !!user;

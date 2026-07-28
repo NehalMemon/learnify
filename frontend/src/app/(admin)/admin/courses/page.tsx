@@ -44,45 +44,9 @@ interface Course {
 }
 
 // ── Skeleton row / card ────────────────────────────────────────────────────
+// Extracted to _components/CoursesSkeletons.tsx for reuse with loading.tsx.
 
-function SkeletonRow() {
-  return (
-    <div className="flex flex-row items-center bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-pulse">
-      <div className="flex min-w-0 flex-1 items-center gap-4 px-6 py-4">
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="h-4 bg-gray-200 rounded w-1/2" />
-          <div className="flex gap-3">
-            <div className="h-3 bg-gray-200 rounded-full w-16" />
-            <div className="h-3 bg-gray-200 rounded w-24" />
-          </div>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <div className="h-7 w-20 bg-gray-200 rounded-lg" />
-          <div className="h-7 w-14 bg-gray-200 rounded-lg" />
-          <div className="h-7 w-16 bg-gray-200 rounded-lg" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SkeletonCard() {
-  return (
-    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm animate-pulse space-y-3">
-      <div className="h-4 bg-gray-200 rounded w-3/4" />
-      <div className="h-3 bg-gray-200 rounded-full w-16" />
-      <div className="space-y-2">
-        <div className="h-3 bg-gray-200 rounded w-1/2" />
-        <div className="h-3 bg-gray-200 rounded w-1/3" />
-      </div>
-      <div className="flex gap-2 pt-2">
-        <div className="h-7 w-20 bg-gray-200 rounded-lg" />
-        <div className="h-7 w-16 bg-gray-200 rounded-lg" />
-        <div className="h-7 w-14 bg-gray-200 rounded-lg" />
-      </div>
-    </div>
-  );
-}
+import { SkeletonRow, SkeletonCard } from './_components/CoursesSkeletons';
 
 // ── Page ───────────────────────────────────────────────────────────────────
 

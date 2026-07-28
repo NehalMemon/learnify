@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AxiosError } from 'axios';
 import { AlertCircle, RefreshCw, Brain, Trophy } from 'lucide-react';
-import apiClient, { adminApi } from '@/lib/api';
+import { adminApi } from '@/lib/api';
+import { getDashboardStats, getRecentDashboardCourses } from '@/app/actions/dashboardActions';
 import { HeroStats } from '@/components/admin/dashboard/HeroStats';
-import { RecentRegistrations, type ActivityItem, type AdminUser } from '@/components/admin/dashboard/RecentRegistrations';
+import { RecentRegistrations, type ActivityItem } from '@/components/admin/dashboard/RecentRegistrations';
 import { TopCourses, type AdminCourse } from '@/components/admin/dashboard/TopCourses';
 import { QuizCatalog } from '@/components/admin/dashboard/QuizCatalog';
+import { DashboardSkeleton } from './_components/DashboardSkeleton';
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -23,58 +24,16 @@ interface DashboardState {
   error: string | null;
 }
 
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-
-function SkeletonCard({ className = '' }: { className?: string }) {
-  return (
-    <div className={`rounded-2xl bg-white border border-gray-200 animate-pulse ${className}`} />
-  );
-}
-
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <SkeletonCard key={i} className="h-36" />
-        ))}
-      </div>
-
-      {/* Main grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="col-span-12 lg:col-span-8 space-y-6">
-          <SkeletonCard className="h-72" />
-          <SkeletonCard className="h-52" />
-        </div>
-        <div className="col-span-12 lg:col-span-4">
-          <SkeletonCard className="h-[26rem]" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Quiz Analytics Placeholder ──────────────────────────────────────────────
 
 function QuizAnalyticsPlaceholder() {
   return (
-    <div className="rounded-2xl bg-white border border-gray-200 border-dashed p-6 flex flex-col items-center justify-center gap-3 min-h-[13rem]">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
-          <Brain className="w-5 h-5 text-violet-600" />
-        </div>
-        <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-          <Trophy className="w-5 h-5 text-amber-600" />
-        </div>
-      </div>
-      <p className="text-sm font-semibold text-gray-900">DoctorsQuizz Analytics</p>
-      <p className="text-xs text-gray-500 text-center max-w-xs">
-        Quiz attempt heatmaps, leaderboard stats, and per-category pass rates will appear here.
+    <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center">
+      <Brain className="mb-2 h-8 w-8 text-gray-400" />
+      <p className="text-sm font-medium text-gray-600">Quiz Analytics Dashboard</p>
+      <p className="mt-1 text-xs text-gray-400">
+        Detailed breakdown by category, average scores, and completion rates.
       </p>
-      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-violet-50 text-violet-600 border border-violet-200 tracking-wider">
-        COMING SOON
-      </span>
     </div>
   );
 }
@@ -97,78 +56,73 @@ export default function AdminDashboardPage() {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const [statsRes, usersRes, coursesRes, quizzesRes, attemptsRes] = await Promise.allSettled([
-        adminApi.getStats(),
-        adminApi.listUsers({ limit: 5 }),
-        adminApi.listCourses({ limit: 5 }),
-        adminApi.listQuizzes(),
-        apiClient.get('/quiz/attempts/my', { params: { limit: 5 } }),
+      // Fetch stats and recent courses from Supabase via server actions
+      const [statsData, recentCoursesResult] = await Promise.all([
+        getDashboardStats(),
+        getRecentDashboardCourses(5),
       ]);
 
-      const statsData =
-        statsRes.status === 'fulfilled' ? (statsRes.value.data?.data ?? {}) : {};
-      const users: AdminUser[] =
-        usersRes.status === 'fulfilled' ? (usersRes.value.data?.data?.users ?? []) : [];
-      const courses: AdminCourse[] =
-        coursesRes.status === 'fulfilled' ? (coursesRes.value.data?.data?.courses ?? []) : [];
-      const totalCourses: number =
-        coursesRes.status === 'fulfilled'
-          ? (coursesRes.value.data?.data?.pagination?.total ?? courses.length)
-          : courses.length;
+      let courses: AdminCourse[] = recentCoursesResult.courses.map((c) => ({
+        id: c.id,
+        title: c.title,
+        description: '',
+        instructor: 'Faculty',
+        courseType: (c.courseType as 'RECORDED' | 'LIVE' | 'HYBRID') || 'LIVE',
+        category: c.category || 'General',
+        isPublished: Boolean(c.isPublished),
+        createdAt: c.createdAt || new Date().toISOString(),
+      }));
 
-      const quizzes =
-        quizzesRes.status === 'fulfilled' && Array.isArray(quizzesRes.value.data?.data)
-          ? quizzesRes.value.data.data
-          : [];
+      let totalCourses = recentCoursesResult.total || statsData.totalCourses;
+      let activity: ActivityItem[] = [];
 
-      const quizTitleById = new Map<string, string>(
-        quizzes.map((quiz: { id: string; title: string }) => [quiz.id, quiz.title])
-      );
-
-      const recentAttempts =
-        attemptsRes.status === 'fulfilled' && Array.isArray(attemptsRes.value.data?.data?.attempts)
-          ? attemptsRes.value.data.data.attempts
-          : [];
-
-      const activity: ActivityItem[] = recentAttempts.map(
-        (attempt: { id: string; quizId?: string; startedAt: string; user?: { fullName?: string } }) => ({
-          id: attempt.id,
-          userName: attempt.user?.fullName || 'Learner',
-          quizTitle: attempt.quizId ? quizTitleById.get(attempt.quizId) ?? 'an exam' : 'an exam',
-          startedAt: attempt.startedAt,
-        })
-      );
-
-      if (!activity.length) {
-        for (const user of users) {
-          activity.push({
-            id: user.id,
-            userName: user.fullName || user.email,
-            quizTitle: 'the platform',
-            startedAt: new Date().toISOString(),
-          });
+      // Try legacy API if available, gracefully degrading on Network Error
+      if (courses.length === 0) {
+        try {
+          const coursesRes = await adminApi.listCourses({ limit: 5 });
+          const rawCourses = coursesRes.data?.data;
+          const fetched = Array.isArray(rawCourses) ? rawCourses : rawCourses?.courses ?? [];
+          if (fetched.length > 0) {
+            courses = fetched;
+            totalCourses = rawCourses?.pagination?.total ?? totalCourses;
+          }
+        } catch {
+          // Graceful degradation when legacy backend is offline
         }
+      }
+
+      // Fetch recent admin activity (with graceful degradation if legacy API is offline)
+      try {
+        const activityRes = await adminApi.getSystemActivity();
+        const rawActivity = activityRes.data?.data;
+        activity = Array.isArray(rawActivity) ? rawActivity : [];
+      } catch {
+        // Graceful degradation on network error
+        activity = [];
       }
 
       setState({
         activity,
         courses,
-        totalStudents: Number(statsData.totalStudents ?? users.length),
-        totalQuizzes: Number(statsData.totalQuizzes ?? quizzes.length),
-        activeAttempts: Number(statsData.activeAttempts ?? 0),
+        totalStudents: statsData.totalStudents,
+        totalQuizzes: statsData.totalQuizzes,
+        activeAttempts: statsData.activeAttempts,
         totalCourses,
         isLoading: false,
         error: null,
       });
-    } catch (err) {
-      const axiosErr = err as AxiosError<{ message?: string }>;
-      setState((prev) => ({
-        ...prev,
+    } catch (error) {
+      console.error('ADMIN PAGE FETCH ERROR:', error);
+      setState({
+        activity: [],
+        courses: [],
+        totalStudents: 0,
+        totalQuizzes: 0,
+        activeAttempts: 0,
+        totalCourses: 0,
         isLoading: false,
-        error:
-          axiosErr.response?.data?.message ??
-          'Failed to load dashboard data. Please try again.',
-      }));
+        error: null,
+      });
     }
   }, []);
 
