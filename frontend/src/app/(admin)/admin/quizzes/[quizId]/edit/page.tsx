@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { PublishQuizModal } from "@/components/admin/PublishQuizModal";
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -366,6 +367,8 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [creditCost, setCreditCost] = useState(0);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   // ── Fetch data on mount ────────────────────────────────────────
   useEffect(() => {
@@ -386,6 +389,7 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
         setSubject(target.subject || "");
         setTimeLimitMinutes(target.durationSec ? Math.floor(target.durationSec / 60).toString() : "60");
         setIsPublished(target.isPublished ?? true);
+        setCreditCost(target.creditCost ?? target.credit_cost ?? 0);
 
         // Map nested questions directly into state
         const rawQuestions = target.questions || [];
@@ -589,7 +593,13 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
                 </label>
                 <button
                   type="button"
-                  onClick={() => setIsPublished(!isPublished)}
+                  onClick={() => {
+                    if (!isPublished) {
+                      setIsPublishModalOpen(true);
+                    } else {
+                      setIsPublished(false);
+                    }
+                  }}
                   className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold transition ${
                     isPublished 
                       ? "bg-emerald-50 text-emerald-700 border border-emerald-200" 
@@ -684,6 +694,17 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
           </div>
         </form>
       </div>
+
+      <PublishQuizModal
+        isOpen={isPublishModalOpen}
+        quizId={quizId}
+        quizTitle={title}
+        initialCost={creditCost}
+        onClose={() => setIsPublishModalOpen(false)}
+        onSuccess={() => {
+          setIsPublished(true);
+        }}
+      />
     </div>
   );
 }

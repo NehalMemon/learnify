@@ -28,6 +28,7 @@ import {
   type QuizCategoryWithSubjects,
 } from '@/app/actions/taxonomyActions';
 import { TaxonomyManager } from '@/components/admin/dashboard/TaxonomyManager';
+import { PublishQuizModal } from '@/components/admin/PublishQuizModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { adminApi } from '@/lib/api';
 
@@ -43,6 +44,7 @@ interface AdminQuiz {
   year?: number | null;
   duration_sec?: number | null;
   is_published?: boolean | null;
+  credit_cost?: number | null;
   category?: QuizCategoryRelation;
 }
 
@@ -87,6 +89,7 @@ export default function AdminQuizzesPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [isTaxonomyOpen, setIsTaxonomyOpen] = useState(false);
+  const [publishTargetQuiz, setPublishTargetQuiz] = useState<AdminQuiz | null>(null);
 
   const limit = 12;
 
@@ -267,21 +270,18 @@ export default function AdminQuizzesPage() {
     }
   };
 
-  const handleToggleStatus = async (quizId: string, currentStatus: boolean) => {
-    const previousQuizzes = allQuizzes;
-
-    setAllQuizzes((prev) =>
-      prev.map((quiz) =>
-        quiz.id === quizId ? { ...quiz, is_published: !currentStatus } : quiz
-      )
-    );
+  const handleToggleStatus = async (quiz: AdminQuiz) => {
+    const isCurrentlyPublished = Boolean(quiz.is_published);
+    if (!isCurrentlyPublished) {
+      setPublishTargetQuiz(quiz);
+      return;
+    }
 
     try {
-      await adminApi.toggleQuizStatus(quizId, { isPublished: !currentStatus });
-      toast.success(`Quiz ${!currentStatus ? 'published' : 'moved to draft'}`);
+      await adminApi.toggleQuizStatus(quiz.id, { isPublished: false });
+      toast.success('Quiz moved to draft');
       await fetchQuizzes({ silent: true });
     } catch {
-      setAllQuizzes(previousQuizzes);
       toast.error('Failed to update status');
     }
   };
@@ -576,7 +576,7 @@ export default function AdminQuizzesPage() {
                       <td className="px-5 py-3">
                         <button
                           type="button"
-                          onClick={() => handleToggleStatus(quiz.id, isPublished)}
+                          onClick={() => handleToggleStatus(quiz)}
                           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
                             isPublished
                               ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15'
@@ -698,6 +698,18 @@ export default function AdminQuizzesPage() {
         isOpen={isTaxonomyOpen}
         onClose={() => setIsTaxonomyOpen(false)}
         onTaxonomyChange={fetchQuizzes}
+      />
+
+      {/* Publish Quiz & Set Price Modal */}
+      <PublishQuizModal
+        isOpen={Boolean(publishTargetQuiz)}
+        quizId={publishTargetQuiz?.id ?? null}
+        quizTitle={publishTargetQuiz?.title}
+        initialCost={publishTargetQuiz?.credit_cost ?? 0}
+        onClose={() => setPublishTargetQuiz(null)}
+        onSuccess={() => {
+          fetchQuizzes({ silent: true });
+        }}
       />
     </div>
   );

@@ -105,17 +105,29 @@ export async function addQuestionsToQuiz(quizId: string, questions: QuizQuestion
   }
 }
 
-export async function publishQuiz(quizId: string) {
+export async function publishQuiz(quizId: string, creditCost: number = 0) {
   try {
     const supabase = await createClient();
     const { error } = await supabase
       .from('quizzes')
-      .update({ is_published: true })
+      .update({
+        is_published: true,
+        credit_cost: creditCost,
+      })
       .eq('id', quizId);
 
     if (error) {
       console.error('publishQuiz error:', error);
       throw new Error(error.message);
+    }
+
+    try {
+      revalidatePath('/admin/quizzes');
+      revalidatePath('/admin/dashboard');
+      revalidatePath('/dashboard');
+      revalidatePath('/student/dashboard');
+    } catch (revalErr) {
+      console.error('publishQuiz revalidate error (non-fatal):', revalErr);
     }
 
     return { success: true };
