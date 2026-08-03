@@ -1,282 +1,143 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { toast } from 'react-hot-toast';
-import { Save, AlertCircle, Sparkles } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { createQuiz, addQuestionsToQuiz, saveQuizDraft } from '@/app/actions/quizAdminActions';
-import { quizApi } from '@/lib/api';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import {
+  Sparkles,
+  FileEdit,
+  FolderTree,
+  ArrowRight,
+  Plus,
+  BookOpen,
+  Layers,
+} from 'lucide-react';
+import { TaxonomyManager } from '@/components/admin/dashboard/TaxonomyManager';
+import { getCategoriesWithSubjects } from '@/app/actions/taxonomyActions';
 
-import { QuizSidebar } from '@/components/admin/quiz/QuizSidebar';
-import { QuestionEditor } from '@/components/admin/quiz/QuestionEditor';
-import { QuizBuilderSchema, QuizBuilderFormValues } from '@/lib/validations/quiz';
-
-interface Category {
-  id: string;
-  name: string;
-}
-
-export default function QuizBuilderPage() {
-  const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Standard medical categories used as a safe fallback when the backend
-  // API is unreachable or the QuizCategory table hasn't been seeded yet.
-  const FALLBACK_CATEGORIES: Category[] = [
-    { id: 'fallback-anatomy', name: 'Anatomy' },
-    { id: 'fallback-biology', name: 'Biology' },
-    { id: 'fallback-chemistry', name: 'Chemistry' },
-    { id: 'fallback-physics', name: 'Physics' },
-    { id: 'fallback-general', name: 'General' },
-  ];
-
-  // Fetch categories on mount
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const res = await quizApi.getCategories();
-        const data: Category[] = res.data?.data || [];
-        setCategories(data.length > 0 ? data : FALLBACK_CATEGORIES);
-      } catch {
-        // Graceful degradation: let the admin continue building the quiz
-        // with fallback categories while the backend API is pending.
-        setCategories(FALLBACK_CATEGORIES);
-      }
-    };
-    fetchCategories();
-  }, []);
-
-  // Initialize React Hook Form with Zod validation
-  const form = useForm<QuizBuilderFormValues>({
-    resolver: zodResolver(QuizBuilderSchema),
-    defaultValues: {
-      title: '',
-      categoryId: '',
-      durationSec: 600, // 10 minutes default
-      questions: [],
-    },
-  });
-
-  const { control, handleSubmit, register, watch, setValue, formState: { errors } } = form;
-
-  // useFieldArray for managing questions list dynamically
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'questions',
-  });
-
-  /**
-   * Maps the rich discriminated-union form state into the flat DB column
-   * structure expected by the addQuestionsToQuiz server action.
-   *
-   * - SINGLE_CHOICE  → options stored in option_a..d, correct index in correct_option & correct_answer JSONB
-   * - TRUE_FALSE      → correct boolean stored in correct_answer JSONB
-   * - MULTIPLE_SELECT → options in option_a..d, correct indices in correct_answer JSONB
-   * - MATCHING_PAIRS  → pairs stored in content JSONB
-   */
-  function mapQuestionToDbRow(q: QuizBuilderFormValues['questions'][number]) {
-    const base = {
-      type: q.type,
-      question_text: q.questionText,
-      content: {} as Record<string, unknown>,
-      correct_answer: {} as Record<string, unknown>,
-      points: 1,
-      option_a: null as string | null,
-      option_b: null as string | null,
-      option_c: null as string | null,
-      option_d: null as string | null,
-      correct_option: null as string | null,
-      explanation: q.explanation ?? null,
-    };
-
-    if (q.type === 'SINGLE_CHOICE') {
-      const labels = ['A', 'B', 'C', 'D'] as const;
-      q.options.forEach((opt, i) => {
-        if (i < 4) {
-          (base as Record<string, unknown>)[`option_${labels[i].toLowerCase()}`] = opt;
-        }
-      });
-      base.correct_option = labels[q.correctOptionIndex] ?? null;
-      base.correct_answer = { correctOptionIndex: q.correctOptionIndex };
-      base.content = { options: q.options };
-    } else if (q.type === 'TRUE_FALSE') {
-      base.correct_answer = { value: q.correctAnswer };
-    } else if (q.type === 'MULTIPLE_SELECT') {
-      const labels = ['A', 'B', 'C', 'D'] as const;
-      q.options.forEach((opt, i) => {
-        if (i < 4) {
-          (base as Record<string, unknown>)[`option_${labels[i].toLowerCase()}`] = opt;
-        }
-      });
-      base.correct_answer = { correctOptionIndices: q.correctOptionIndices };
-      base.content = { options: q.options };
-    } else if (q.type === 'MATCHING_PAIRS') {
-      base.content = { pairs: q.pairs };
-      base.correct_answer = { pairs: q.pairs };
-    }
-
-    return base;
-  }
-
-  const onSubmit: SubmitHandler<QuizBuilderFormValues> = async (data) => {
-    setIsSaving(true);
-    try {
-      // Step 1 – Create the quiz shell and retrieve its new ID
-      const newQuiz = await createQuiz({
-        categoryId: data.categoryId,
-        title: data.title,
-        duration_sec: Number(data.durationSec),
-      });
-
-      // Step 2 – Bulk-insert questions linked to the new quiz
-      const dbRows = data.questions.map(mapQuestionToDbRow);
-      await addQuestionsToQuiz(newQuiz.id, dbRows);
-
-      toast.success('Quiz created successfully!');
-      form.reset();
-      setActiveIndex(null);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Error occurred while saving the quiz.';
-      toast.error(message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const onInvalid = () => {
-    toast.error('Please fix the errors in your questions before saving.');
-  };
-
-  const handleSaveDraft = async () => {
-    setIsSaving(true);
-    try {
-      const title = watch('title') || 'Untitled Draft Quiz';
-      const categoryId = watch('categoryId');
-      const durationSec = watch('durationSec');
-
-      const res = await saveQuizDraft({
-        title,
-        categoryId,
-        duration_sec: durationSec ? Number(durationSec) : 3600,
-      });
-
-      if (res.success) {
-        toast.success('Draft saved!');
-        router.push('/admin/quizzes');
-      } else {
-        toast.error(res.error || 'Failed to save draft.');
-      }
-    } catch (err) {
-      console.error('Draft Error:', err);
-      toast.error('Failed to save draft.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+export default function QuizBuilderHubPage() {
+  const [isTaxonomyOpen, setIsTaxonomyOpen] = useState(false);
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit as unknown as SubmitHandler<any>, onInvalid)}
-      className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-gray-50 border border-gray-200 rounded-xl shadow-sm"
-    >
-      {/* Quiz Metadata / Control Header */}
-      <header className="h-16 shrink-0 bg-white border-b border-gray-200 px-6 flex items-center justify-between z-10 select-none">
-        <div className="flex items-center gap-4 flex-1 max-w-4xl">
-          {/* Title Input */}
-          <div className="flex-1">
-            <input
-              type="text"
-              {...register('title')}
-              placeholder="Enter Quiz Title..."
-              className="w-full bg-transparent border-0 font-bold text-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-0 px-0 py-1"
-            />
-            {errors.title && (
-              <p className="text-[10px] font-semibold text-red-500 absolute -bottom-1 left-6 flex items-center gap-0.5">
-                <AlertCircle className="h-3 w-3" />
-                {errors.title.message}
-              </p>
-            )}
-          </div>
-
-          {/* Category Dropdown */}
-          <div className="w-56">
-            <select
-              {...register('categoryId')}
-              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-colors"
-            >
-              <option value="">Select Category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Duration Input */}
-          <div className="w-40 flex items-center gap-2">
-            <input
-              type="number"
-              {...register('durationSec', { valueAsNumber: true })}
-              placeholder="Duration (sec)"
-              className="w-full px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition-colors"
-            />
-            <span className="text-xs text-gray-400 font-semibold shrink-0">sec</span>
-          </div>
+    <div className="mx-auto w-full max-w-7xl pb-12 font-sans text-slate-900 antialiased space-y-8">
+      {/* ── Page Header ────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between border-b border-slate-200/80 pb-6">
+        <div>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-purple-700">
+            <Sparkles className="h-3.5 w-3.5" />
+            Admin Workspace
+          </span>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
+            Quiz Builder Workspace
+          </h1>
+          <p className="mt-1.5 text-sm font-medium text-slate-600 max-w-2xl leading-relaxed">
+            Select a creation flow to draft, generate, or manage quizzes for your students.
+          </p>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-3">
           <Link
-            href="/admin/quizzes/ai-generator"
-            className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
+            href="/admin/quizzes"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-slate-950"
           >
-            ✨ Generate Quiz with AI
+            <BookOpen className="h-4 w-4 text-purple-600" />
+            View Quiz Library
           </Link>
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-all cursor-pointer"
-          >
-            Save Draft
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all shadow-sm cursor-pointer"
-          >
-            <Save className="h-4 w-4" />
-            {isSaving ? 'Saving...' : 'Save Quiz'}
-          </button>
         </div>
-      </header>
-
-      {/* Main Split-Pane Workspace */}
-      <div className="flex flex-row h-[calc(100vh-64px)] overflow-hidden w-full">
-        {/* Left Sidebar Pane */}
-        <QuizSidebar
-          questions={fields as any}
-          activeIndex={activeIndex}
-          setActiveIndex={setActiveIndex}
-          append={append}
-          remove={remove}
-        />
-
-        {/* Right Editor Canvas Pane */}
-        <QuestionEditor
-          register={register}
-          watch={watch}
-          setValue={setValue}
-          errors={errors}
-          activeIndex={activeIndex}
-        />
       </div>
-    </form>
+
+      {/* ── 3 Action Cards Grid ───────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Card 1: Generate with AI */}
+        <Link
+          href="/admin/quizzes/ai-generator"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-900 via-indigo-900 to-slate-900 p-7 text-white shadow-xl shadow-purple-900/10 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-900/20"
+        >
+          <div className="space-y-4">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-purple-300 backdrop-blur-md transition group-hover:scale-110 group-hover:bg-white/20">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-purple-300/80">
+                Automated Generation
+              </span>
+              <h3 className="mt-1 text-2xl font-extrabold text-white">
+                Generate with AI
+              </h3>
+            </div>
+            <p className="text-xs leading-relaxed font-medium text-purple-100/80">
+              Create intelligent medical assessments from topics, clinical scenarios, or uploaded documents in seconds.
+            </p>
+          </div>
+
+          <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-bold text-purple-200 transition group-hover:text-white">
+            <span>Start AI Generator</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </div>
+        </Link>
+
+        {/* Card 2: Create Manually */}
+        <Link
+          href="/admin/quizzes/builder/new"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-xl"
+        >
+          <div className="space-y-4">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 transition group-hover:scale-110 group-hover:bg-purple-600 group-hover:text-white">
+              <FileEdit className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                Step-by-Step Builder
+              </span>
+              <h3 className="mt-1 text-2xl font-extrabold text-slate-900">
+                Create Manually
+              </h3>
+            </div>
+            <p className="text-xs leading-relaxed font-medium text-slate-500">
+              Build a custom quiz step-by-step with single choice, true/false, multiple select, and matching pairs.
+            </p>
+          </div>
+
+          <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-purple-600 transition group-hover:text-purple-700">
+            <span>Open Quiz Builder</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </div>
+        </Link>
+
+        {/* Card 3: Manage Taxonomy */}
+        <button
+          type="button"
+          onClick={() => setIsTaxonomyOpen(true)}
+          className="group relative flex flex-col justify-between text-left overflow-hidden rounded-2xl border border-slate-200 bg-white p-7 text-slate-900 shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-purple-300 hover:shadow-xl cursor-pointer"
+        >
+          <div className="space-y-4">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition group-hover:scale-110 group-hover:bg-indigo-600 group-hover:text-white">
+              <FolderTree className="h-6 w-6" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
+                Curriculum Structure
+              </span>
+              <h3 className="mt-1 text-2xl font-extrabold text-slate-900">
+                Manage Taxonomy
+              </h3>
+            </div>
+            <p className="text-xs leading-relaxed font-medium text-slate-500">
+              Organize medical categories, subjects, and curriculum taxonomy for quiz classification.
+            </p>
+          </div>
+
+          <div className="mt-8 flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-indigo-600 transition group-hover:text-indigo-700 w-full">
+            <span>Manage Categories &amp; Subjects</span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          </div>
+        </button>
+      </div>
+
+      {/* ── Taxonomy Slide-over ───────────────────────────────────── */}
+      <TaxonomyManager
+        isOpen={isTaxonomyOpen}
+        onClose={() => setIsTaxonomyOpen(false)}
+      />
+    </div>
   );
 }

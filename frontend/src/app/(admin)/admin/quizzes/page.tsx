@@ -307,22 +307,14 @@ export default function AdminQuizzesPage() {
             Admin Console
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#191c1e] md:text-4xl">
-            Quiz Management
+            Quiz Library
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b5a68]">
-            Review, publish, and maintain assessments from your Supabase quiz catalog.
+            Review, publish, and maintain assessments from your quiz catalog.
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <button
-            type="button"
-            onClick={() => setIsTaxonomyOpen(true)}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-          >
-            <FolderPlus className="h-4 w-4 text-[#3525cd]" />
-            Manage Categories
-          </button>
           <button
             type="button"
             onClick={() => fetchQuizzes({ silent: true })}
@@ -341,18 +333,11 @@ export default function AdminQuizzesPage() {
             Export CSV
           </button>
           <Link
-            href="/admin/quizzes/create/ai"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd]/10 px-4 text-sm font-semibold text-[#3525cd] border border-[#3525cd]/20 transition hover:bg-[#3525cd]/20"
-          >
-            <Sparkles className="h-4 w-4" />
-            Create with AI
-          </Link>
-          <Link
-            href="/admin/quizzes/create"
+            href="/admin/quizzes/builder"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
-            Create Quiz
+            + New Quiz
           </Link>
         </div>
       </div>
@@ -677,33 +662,7 @@ export default function AdminQuizzesPage() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <Link
-          href="/admin/quizzes/create/ai"
-          className="rounded-xl border border-[#3525cd]/15 bg-[#3525cd] p-5 text-white shadow-sm shadow-[#3525cd]/20 transition hover:bg-[#2f20b8]"
-        >
-          <Sparkles className="h-5 w-5" />
-          <h3 className="mt-4 text-base font-bold tracking-tight text-white">Generate Quiz with AI</h3>
-          <p className="mt-1 text-sm leading-6 text-white/80">Create assessments from course material.</p>
-        </Link>
-        <Link
-          href="/admin/quizzes/import"
-          className="rounded-xl border border-[#e4e6ef] bg-[#white] p-5 shadow-sm transition hover:bg-[#fbfbfd]"
-        >
-          <Upload className="h-5 w-5 text-[#3525cd]" />
-          <h3 className="mt-4 text-base font-bold tracking-tight text-[#191c1e]">Import Questions</h3>
-          <p className="mt-1 text-sm leading-6 text-[#696778]">Upload CSV, JSON, or Excel templates.</p>
-        </Link>
-        <button
-          type="button"
-          onClick={() => setIsTaxonomyOpen(true)}
-          className="rounded-xl border border-[#e4e6ef] bg-white p-5 text-left shadow-sm transition hover:bg-[#fbfbfd]"
-        >
-          <Settings2 className="h-5 w-5 text-[#3525cd]" />
-          <h3 className="mt-4 text-base font-bold tracking-tight text-[#191c1e]">Quiz Taxonomy</h3>
-          <p className="mt-1 text-sm leading-6 text-[#696778]">Manage global categories and subjects.</p>
-        </button>
-      </div>
+
 
       {/* Taxonomy Manager Slide-over Modal */}
       <TaxonomyManager
