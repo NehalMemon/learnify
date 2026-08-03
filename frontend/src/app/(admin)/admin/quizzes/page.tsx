@@ -1,120 +1,48 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'react-hot-toast';
 import {
   BookOpen,
-  Calendar,
   Clock3,
-  Download,
+  FileEdit,
   FolderPlus,
-  Layers3,
-  Pencil,
   Plus,
   RefreshCw,
-  Search,
   Settings2,
   Sparkles,
   ToggleLeft,
   ToggleRight,
-  Trash2,
   Upload,
-  Tag,
 } from 'lucide-react';
 import { getAdminQuizzes } from '@/app/actions/quizAdminActions';
-import {
-  getCategoriesWithSubjects,
-  type QuizCategoryWithSubjects,
-} from '@/app/actions/taxonomyActions';
 import { TaxonomyManager } from '@/components/admin/dashboard/TaxonomyManager';
-import { PublishQuizModal } from '@/components/admin/PublishQuizModal';
 import { Spinner } from '@/components/ui/Spinner';
-import { adminApi } from '@/lib/api';
-
-type QuizCategoryRelation = { id?: string; name?: string | null } | { name?: string | null }[] | null | undefined;
-type QuizSubjectRelation = { id?: string; name?: string | null } | { name?: string | null }[] | null | undefined;
 
 interface AdminQuiz {
   id: string;
   title: string;
-  category_id?: string | null;
-  subject_id?: string | null;
-  subject?: string | QuizSubjectRelation;
-  year?: number | null;
-  duration_sec?: number | null;
   is_published?: boolean | null;
-  credit_cost?: number | null;
-  created_at?: string | null;
-  category?: QuizCategoryRelation;
+  duration_sec?: number | null;
 }
 
-function getCategoryName(category: QuizCategoryRelation): string {
-  if (Array.isArray(category)) return category[0]?.name || 'Uncategorized';
-  return category?.name || 'Uncategorized';
-}
-
-function getSubjectName(subject: string | QuizSubjectRelation): string {
-  if (typeof subject === 'string') return subject;
-  if (Array.isArray(subject)) return subject[0]?.name || 'General';
-  return subject?.name || 'General';
-}
-
-function formatDuration(seconds?: number | null): string {
-  if (!seconds || seconds <= 0) return 'Not set';
-
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-}
-
-function csvCell(value: string | number | boolean | null | undefined): string {
-  return `"${String(value ?? '').replace(/"/g, '""')}"`;
-}
-
-export default function AdminQuizzesPage() {
+export default function QuizBuilderHubPage() {
   const [allQuizzes, setAllQuizzes] = useState<AdminQuiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [submittedSearch, setSubmittedSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Taxonomy State
-  const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [isTaxonomyOpen, setIsTaxonomyOpen] = useState(false);
-  const [publishTargetQuiz, setPublishTargetQuiz] = useState<AdminQuiz | null>(null);
 
-  const limit = 12;
-
-  const fetchTaxonomy = async () => {
-    try {
-      const data = await getCategoriesWithSubjects();
-      setTaxonomy(data);
-    } catch (err) {
-      console.error('Failed to load taxonomy:', err);
-    }
-  };
-
-  const fetchQuizzes = async ({ silent = false }: { silent?: boolean } = {}) => {
+  const fetchQuizzesStats = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (silent) setIsRefreshing(true);
     else setIsLoading(true);
 
     setError(null);
-    setSelectedIds([]);
-
     try {
-      const [quizzes] = await Promise.all([getAdminQuizzes(), fetchTaxonomy()]);
+      const quizzes = await getAdminQuizzes();
       setAllQuizzes(Array.isArray(quizzes) ? (quizzes as AdminQuiz[]) : []);
     } catch {
-      setError('Failed to load quizzes from Supabase.');
+      setError('Failed to load quiz statistics');
       setAllQuizzes([]);
     } finally {
       setIsLoading(false);
@@ -123,564 +51,238 @@ export default function AdminQuizzesPage() {
   };
 
   useEffect(() => {
-    fetchQuizzes();
+    fetchQuizzesStats();
   }, []);
 
-  // Filter available subjects based on selected category
-  const availableSubjects = useMemo(() => {
-    if (!selectedCategoryId) return [];
-    const cat = taxonomy.find((c) => c.id === selectedCategoryId);
-    return cat ? cat.subjects : [];
-  }, [taxonomy, selectedCategoryId]);
-
-  const filteredQuizzes = useMemo(() => {
-    const query = submittedSearch.trim().toLowerCase();
-
-    return allQuizzes.filter((quiz) => {
-      // Category filter
-      if (selectedCategoryId) {
-        const catName = taxonomy.find((c) => c.id === selectedCategoryId)?.name;
-        const quizCatName = getCategoryName(quiz.category);
-        const matchesCatId = quiz.category_id === selectedCategoryId;
-        const matchesCatName = quizCatName === catName;
-        if (!matchesCatId && !matchesCatName) return false;
-      }
-
-      // Subject filter
-      if (selectedSubjectId) {
-        const selectedSubjObj = availableSubjects.find((s) => s.id === selectedSubjectId);
-        const quizSubjName = getSubjectName(quiz.subject);
-        const matchesSubjId = quiz.subject_id === selectedSubjectId;
-        const matchesSubjName = selectedSubjObj && quizSubjName === selectedSubjObj.name;
-        if (!matchesSubjId && !matchesSubjName) return false;
-      }
-
-      // Search Query filter
-      if (query) {
-        const categoryName = getCategoryName(quiz.category);
-        const subjectName = getSubjectName(quiz.subject);
-        const haystack = [quiz.title, subjectName, categoryName, quiz.year]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-
-        if (!haystack.includes(query)) return false;
-      }
-
-      return true;
-    });
-  }, [allQuizzes, submittedSearch, selectedCategoryId, selectedSubjectId, taxonomy, availableSubjects]);
-
-  const totalQuizzes = filteredQuizzes.length;
-  const totalPages = Math.max(1, Math.ceil(totalQuizzes / limit));
-  const visibleQuizzes = filteredQuizzes.slice((currentPage - 1) * limit, currentPage * limit);
+  const totalQuizzes = allQuizzes.length;
   const publishedCount = allQuizzes.filter((quiz) => Boolean(quiz.is_published)).length;
-  const draftCount = allQuizzes.length - publishedCount;
+  const draftCount = totalQuizzes - publishedCount;
   const timedCount = allQuizzes.filter((quiz) => Boolean(quiz.duration_sec && quiz.duration_sec > 0)).length;
-
-  const allVisibleSelected =
-    visibleQuizzes.length > 0 && visibleQuizzes.every((quiz) => selectedIds.includes(quiz.id));
-
-  const showingFrom = totalQuizzes === 0 ? 0 : (currentPage - 1) * limit + 1;
-  const showingTo = Math.min(currentPage * limit, totalQuizzes);
-
-  const handleSearch = (event: React.FormEvent) => {
-    event.preventDefault();
-    setSubmittedSearch(searchQuery);
-    setCurrentPage(1);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    const visibleIds = visibleQuizzes.map((quiz) => quiz.id);
-
-    if (checked) {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
-      return;
-    }
-
-    setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
-  };
-
-  const toggleSelection = (id: string, checked: boolean) => {
-    setSelectedIds((prev) =>
-      checked ? Array.from(new Set([...prev, id])) : prev.filter((selectedId) => selectedId !== id)
-    );
-  };
-
-  const handleExportQuizzes = () => {
-    const quizzesToExport = filteredQuizzes;
-
-    if (quizzesToExport.length === 0) {
-      toast.error('No quizzes to export');
-      return;
-    }
-
-    const headers = ['Title', 'Subject', 'Year', 'Duration', 'Status', 'Category'];
-    const csvContent = [
-      headers.map(csvCell).join(','),
-      ...quizzesToExport.map((quiz) =>
-        [
-          quiz.title,
-          getSubjectName(quiz.subject),
-          quiz.year || '',
-          formatDuration(quiz.duration_sec),
-          quiz.is_published ? 'Published' : 'Draft',
-          getCategoryName(quiz.category),
-        ]
-          .map(csvCell)
-          .join(',')
-      ),
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `quizzes_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    toast.success(`Exported ${quizzesToExport.length} quizzes`);
-  };
-
-  const handleDeleteQuiz = async (quizId: string) => {
-    if (!window.confirm('Delete this quiz? This action is irreversible.')) return;
-
-    try {
-      await adminApi.deleteQuiz(quizId);
-      toast.success('Quiz deleted successfully');
-      await fetchQuizzes({ silent: true });
-    } catch {
-      toast.error('Failed to delete quiz');
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (!window.confirm(`Delete the ${selectedIds.length} selected quizzes?`)) return;
-
-    try {
-      await Promise.all(selectedIds.map((id) => adminApi.deleteQuiz(id)));
-      toast.success('Selected quizzes deleted successfully');
-      setCurrentPage(1);
-      await fetchQuizzes({ silent: true });
-    } catch {
-      toast.error('Failed to delete some quizzes');
-    }
-  };
-
-  const handleToggleStatus = async (quiz: AdminQuiz) => {
-    const isCurrentlyPublished = Boolean(quiz.is_published);
-    if (!isCurrentlyPublished) {
-      setPublishTargetQuiz(quiz);
-      return;
-    }
-
-    try {
-      await adminApi.toggleQuizStatus(quiz.id, { isPublished: false });
-      toast.success('Quiz moved to draft');
-      await fetchQuizzes({ silent: true });
-    } catch {
-      toast.error('Failed to update status');
-    }
-  };
-
-  const handleBulkStatus = async (isPublished: boolean) => {
-    try {
-      await Promise.all(
-        selectedIds.map((id) => adminApi.toggleQuizStatus(id, { isPublished }))
-      );
-      toast.success(`Selected quizzes set to ${isPublished ? 'Published' : 'Draft'}`);
-      await fetchQuizzes({ silent: true });
-    } catch {
-      toast.error('Failed to update status for some quizzes');
-    }
-  };
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-10 font-sans text-[#191c1e] antialiased">
+      {/* ── Top Header ─────────────────────────────────────────────── */}
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4f46e5]">
             Admin Console
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#191c1e] md:text-4xl">
-            Quiz Library
+            Quiz Builder
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b5a68]">
-            Review, publish, and maintain assessments from your quiz catalog.
+            Creation Hub — Design, generate, import, and structure assessments for your platform.
           </p>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
             type="button"
-            onClick={() => fetchQuizzes({ silent: true })}
+            onClick={() => setIsTaxonomyOpen(true)}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
+          >
+            <FolderPlus className="h-4 w-4 text-[#3525cd]" />
+            Manage Categories
+          </button>
+          <button
+            type="button"
+            onClick={() => fetchQuizzesStats({ silent: true })}
             disabled={isRefreshing}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button
-            type="button"
-            onClick={handleExportQuizzes}
+          <Link
+            href="/admin/quizzes/library"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
           >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
+            <BookOpen className="h-4 w-4 text-[#3525cd]" />
+            Quiz Library
+          </Link>
           <Link
-            href="/admin/quizzes/builder"
+            href="/admin/quizzes/create/ai"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd]/10 px-4 text-sm font-semibold text-[#3525cd] border border-[#3525cd]/20 transition hover:bg-[#3525cd]/20"
+          >
+            <Sparkles className="h-4 w-4" />
+            Create with AI
+          </Link>
+          <Link
+            href="/admin/quizzes/create"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
-            + New Quiz
+            Create Quiz
           </Link>
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
-        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Total</span>
-            <BookOpen className="h-4 w-4 text-[#4f46e5]" />
-          </div>
-          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{allQuizzes.length}</div>
-          <p className="mt-1 text-xs text-[#777586]">Supabase quizzes</p>
-        </div>
-        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Published</span>
-            <ToggleRight className="h-4 w-4 text-emerald-600" />
-          </div>
-          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{publishedCount}</div>
-          <p className="mt-1 text-xs text-[#777586]">Visible to students</p>
-        </div>
-        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Drafts</span>
-            <ToggleLeft className="h-4 w-4 text-[#777586]" />
-          </div>
-          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{draftCount}</div>
-          <p className="mt-1 text-xs text-[#777586]">Awaiting publish</p>
-        </div>
-        <div className="rounded-xl border border-[#e4e6ef] bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Timed</span>
-            <Clock3 className="h-4 w-4 text-[#4f46e5]" />
-          </div>
-          <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{timedCount}</div>
-          <p className="mt-1 text-xs text-[#777586]">With duration set</p>
-        </div>
-      </div>
-
-      <div className="mb-5 flex flex-col gap-3 rounded-xl border border-[#e4e6ef] bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <form onSubmit={handleSearch} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-3xl">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by title, subject, or category"
-              className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-10 pr-4 text-sm text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#4f46e5] focus:bg-white focus:ring-4 focus:ring-[#4f46e5]/10"
-            />
-          </div>
-
-          {/* Category Filter Select */}
-          <select
-            value={selectedCategoryId}
-            onChange={(e) => {
-              setSelectedCategoryId(e.target.value);
-              setSelectedSubjectId('');
-              setCurrentPage(1);
-            }}
-            className="min-h-11 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white sm:w-44"
-          >
-            <option value="">All Categories</option>
-            {taxonomy.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Subject Filter Select */}
-          <select
-            value={selectedSubjectId}
-            onChange={(e) => {
-              setSelectedSubjectId(e.target.value);
-              setCurrentPage(1);
-            }}
-            disabled={!selectedCategoryId || availableSubjects.length === 0}
-            className="min-h-11 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white disabled:opacity-50 sm:w-44"
-          >
-            <option value="">All Subjects</option>
-            {availableSubjects.map((subj) => (
-              <option key={subj.id} value={subj.id}>
-                {subj.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="submit"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#3525cd] px-5 text-sm font-semibold text-white transition hover:bg-[#2f20b8]"
-          >
-            Search
-          </button>
-        </form>
-
-        <div className="flex min-h-11 flex-wrap items-center gap-2">
-          {selectedIds.length > 0 ? (
-            <>
-              <span className="rounded-full bg-[#3525cd]/10 px-3 py-1 text-xs font-semibold text-[#3525cd]">
-                {selectedIds.length} selected
-              </span>
-              <button
-                type="button"
-                onClick={() => handleBulkStatus(true)}
-                className="rounded-lg border border-[#dadce5] bg-white px-3 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-              >
-                Publish
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBulkStatus(false)}
-                className="rounded-lg border border-[#dadce5] bg-white px-3 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-              >
-                Draft
-              </button>
-              <button
-                type="button"
-                onClick={handleBulkDelete}
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
-              >
-                Delete
-              </button>
-            </>
-          ) : (
-            <span className="px-1 text-sm text-[#777586]">Select rows for bulk actions</span>
-          )}
-        </div>
-      </div>
-
+      {/* ── 4 Stats Cards ────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="flex min-h-72 items-center justify-center rounded-xl border border-[#e4e6ef] bg-white">
-          <Spinner size="lg" />
+        <div className="mb-8 flex min-h-32 items-center justify-center rounded-xl border border-[#e4e6ef] bg-white">
+          <Spinner size="md" />
         </div>
-      ) : null}
+      ) : (
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs transition hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Total</span>
+              <BookOpen className="h-4.5 w-4.5 text-[#4f46e5]" />
+            </div>
+            <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{totalQuizzes}</div>
+            <p className="mt-1 text-xs text-[#777586]">Total quizzes in catalog</p>
+          </div>
 
-      {!isLoading && error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm font-medium text-red-700">
+          <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs transition hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Published</span>
+              <ToggleRight className="h-4.5 w-4.5 text-emerald-600" />
+            </div>
+            <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{publishedCount}</div>
+            <p className="mt-1 text-xs text-[#777586]">Visible to students</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs transition hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Drafts</span>
+              <ToggleLeft className="h-4.5 w-4.5 text-[#777586]" />
+            </div>
+            <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{draftCount}</div>
+            <p className="mt-1 text-xs text-[#777586]">Awaiting publication</p>
+          </div>
+
+          <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs transition hover:shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777586]">Timed</span>
+              <Clock3 className="h-4.5 w-4.5 text-[#4f46e5]" />
+            </div>
+            <div className="mt-4 text-3xl font-bold tracking-tight text-[#191c1e]">{timedCount}</div>
+            <p className="mt-1 text-xs text-[#777586]">With strict duration</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700">
           {error}
         </div>
-      ) : null}
+      )}
 
-      {!isLoading && !error && visibleQuizzes.length > 0 ? (
-        <div className="overflow-hidden rounded-xl border border-[#e4e6ef] bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-[#eceef5] bg-[#fbfbfd] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Creation Hub Action Cards ────────────────────────────── */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold tracking-tight text-[#191c1e]">
+          Creation Tools & Workflows
+        </h2>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* 1. Manual Quiz Creator */}
+          <Link
+            href="/admin/quizzes/create"
+            className="group flex flex-col justify-between rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3525cd]/40 hover:shadow-md"
+          >
             <div>
-              <h2 className="text-base font-bold tracking-tight text-[#191c1e]">Quizzes</h2>
-              <p className="text-sm text-[#777586]">
-                Showing {showingFrom}-{showingTo} of {totalQuizzes}
-                {submittedSearch ? ` matching "${submittedSearch}"` : ''}
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#3525cd]/10 text-[#3525cd] transition group-hover:bg-[#3525cd] group-hover:text-white">
+                <FileEdit className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-[#191c1e]">Create Manual Quiz</h3>
+              <p className="mt-1 text-xs leading-relaxed text-[#696778]">
+                Build custom assessments question-by-question with single choice, true/false, or matching options.
               </p>
             </div>
-          </div>
-
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[920px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-[#eceef5] bg-[#f7f7fb]">
-                  <th className="w-12 px-5 py-3">
-                    <input
-                      type="checkbox"
-                      checked={allVisibleSelected}
-                      onChange={(event) => handleSelectAll(event.target.checked)}
-                      className="h-4 w-4 rounded border-[#c9cbd6] text-[#3525cd] focus:ring-[#4f46e5]/20"
-                      aria-label="Select all visible quizzes"
-                    />
-                  </th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Title</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Subject</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Year</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Duration</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Category</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Status</th>
-                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Created Date</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#eceef5]">
-                {visibleQuizzes.map((quiz) => {
-                  const isPublished = Boolean(quiz.is_published);
-                  const categoryName = getCategoryName(quiz.category);
-                  const subjectName = getSubjectName(quiz.subject);
-                  const formattedDate = quiz.created_at
-                    ? new Date(quiz.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : 'Recently';
-
-                  return (
-                    <tr key={quiz.id} className="group transition hover:bg-[#fbfbfd]">
-                      <td className="px-5 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(quiz.id)}
-                          onChange={(event) => toggleSelection(quiz.id, event.target.checked)}
-                          className="h-4 w-4 rounded border-[#c9cbd6] text-[#3525cd] focus:ring-[#4f46e5]/20"
-                          aria-label={`Select ${quiz.title}`}
-                        />
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="max-w-md">
-                          <div className="truncate text-sm font-semibold text-[#191c1e]">{quiz.title}</div>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#777586]">
-                            <Layers3 className="h-3.5 w-3.5" />
-                            {categoryName}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f0ff] px-2.5 py-1 text-xs font-semibold text-[#3525cd]">
-                          <Tag className="h-3 w-3" />
-                          {subjectName}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-sm font-medium text-[#4b4a58]">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-[#8d8b99]" />
-                          {quiz.year || 'Any'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-sm font-medium text-[#4b4a58]">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock3 className="h-3.5 w-3.5 text-[#8d8b99]" />
-                          {formatDuration(quiz.duration_sec)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-sm text-[#5b5a68]">{categoryName}</td>
-                      <td className="px-5 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(quiz)}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                            isPublished
-                              ? 'bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15'
-                              : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/15'
-                          }`}
-                          title={isPublished ? 'Move to draft' : 'Publish quiz'}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              isPublished ? 'bg-emerald-500' : 'bg-gray-400'
-                            }`}
-                          />
-                          {isPublished ? 'Published' : 'Draft'}
-                        </button>
-                      </td>
-                      <td className="px-5 py-3 text-xs font-medium text-[#696778]">
-                        {formattedDate}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/quizzes/${quiz.id}/edit`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#3525cd] transition hover:bg-[#3525cd]/10"
-                            aria-label={`Edit ${quiz.title}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteQuiz(quiz.id)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
-                            aria-label={`Delete ${quiz.title}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-col gap-3 border-t border-[#eceef5] bg-[#fbfbfd] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm font-medium text-[#696778]">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={currentPage === 1}
-                className="min-h-10 rounded-lg border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                disabled={currentPage === totalPages}
-                className="min-h-10 rounded-lg border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#3525cd] transition hover:bg-[#f1f0ff] disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                Next
-              </button>
+            <div className="mt-6 flex items-center text-xs font-bold text-[#3525cd]">
+              <span>Start Builder</span>
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
             </div>
-          </div>
+          </Link>
+
+          {/* 2. Generate Quiz with AI */}
+          <Link
+            href="/admin/quizzes/create/ai"
+            className="group flex flex-col justify-between rounded-2xl border border-[#3525cd]/20 bg-gradient-to-br from-[#3525cd] to-[#4f46e5] p-6 text-white shadow-sm shadow-[#3525cd]/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+          >
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20 text-white backdrop-blur-xs">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-white">Generate Quiz with AI</h3>
+              <p className="mt-1 text-xs leading-relaxed text-white/80">
+                Generate high-quality medical and foundation quizzes automatically from prompt topics or materials.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-white">
+              <span>Generate with AI</span>
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* 3. Import Questions */}
+          <Link
+            href="/admin/quizzes/import"
+            className="group flex flex-col justify-between rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3525cd]/40 hover:shadow-md"
+          >
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
+                <Upload className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-[#191c1e]">Import Questions</h3>
+              <p className="mt-1 text-xs leading-relaxed text-[#696778]">
+                Bulk upload questions and answers via structured CSV, JSON, or Excel templates.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-emerald-600">
+              <span>Import Files</span>
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* 4. Quiz Taxonomy */}
+          <button
+            type="button"
+            onClick={() => setIsTaxonomyOpen(true)}
+            className="group flex flex-col justify-between text-left rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3525cd]/40 hover:shadow-md cursor-pointer"
+          >
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 transition group-hover:bg-indigo-600 group-hover:text-white">
+                <Settings2 className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-[#191c1e]">Quiz Taxonomy</h3>
+              <p className="mt-1 text-xs leading-relaxed text-[#696778]">
+                Organize categories, subjects, programs, and study years across the entire quiz platform.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-indigo-600">
+              <span>Configure Taxonomy</span>
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </button>
+
+          {/* 5. Browse Quiz Library */}
+          <Link
+            href="/admin/quizzes/library"
+            className="group flex flex-col justify-between rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3525cd]/40 hover:shadow-md md:col-span-2 lg:col-span-2"
+          >
+            <div>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 transition group-hover:bg-purple-600 group-hover:text-white">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-[#191c1e]">Quiz Library Ledger</h3>
+              <p className="mt-1 text-xs leading-relaxed text-[#696778]">
+                Browse, search, filter, publish, draft, edit, or delete existing assessments from the main catalog.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-purple-600">
+              <span>Open Quiz Library</span>
+              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
         </div>
-      ) : null}
+      </div>
 
-      {!isLoading && !error && visibleQuizzes.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#cfd1dc] bg-white px-6 py-16 text-center shadow-sm">
-          <BookOpen className="mx-auto h-10 w-10 text-[#8d8b99]" />
-          <h2 className="mt-4 text-lg font-bold tracking-tight text-[#191c1e]">No quizzes found</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#696778]">
-            {submittedSearch || selectedCategoryId || selectedSubjectId
-              ? 'No Supabase quizzes match your filter criteria. Try clearing search, category, or subject filters.'
-              : 'Create your first quiz to start building the assessment catalog.'}
-          </p>
-          {!submittedSearch && !selectedCategoryId && !selectedSubjectId ? (
-            <Link
-              href="/admin/quizzes/create"
-              className="mt-6 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
-            >
-              <Plus className="h-4 w-4" />
-              Create Quiz
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-
-
-      {/* Taxonomy Manager Slide-over Modal */}
+      {/* Slide-over Modal for Taxonomy Management */}
       <TaxonomyManager
         isOpen={isTaxonomyOpen}
         onClose={() => setIsTaxonomyOpen(false)}
-        onTaxonomyChange={fetchQuizzes}
-      />
-
-      {/* Publish Quiz & Set Price Modal */}
-      <PublishQuizModal
-        isOpen={Boolean(publishTargetQuiz)}
-        quizId={publishTargetQuiz?.id ?? null}
-        quizTitle={publishTargetQuiz?.title}
-        initialCost={publishTargetQuiz?.credit_cost ?? 0}
-        onClose={() => setPublishTargetQuiz(null)}
-        onSuccess={() => {
-          fetchQuizzes({ silent: true });
-        }}
+        onTaxonomyChange={fetchQuizzesStats}
       />
     </div>
   );
