@@ -28,12 +28,18 @@ import {
 } from '@/app/actions/taxonomyActions';
 
 interface TaxonomyManagerProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   onTaxonomyChange?: () => void;
+  isInline?: boolean;
 }
 
-export function TaxonomyManager({ isOpen, onClose, onTaxonomyChange }: TaxonomyManagerProps) {
+export function TaxonomyManager({
+  isOpen = true,
+  onClose,
+  onTaxonomyChange,
+  isInline = false,
+}: TaxonomyManagerProps) {
   const [categories, setCategories] = useState<QuizCategoryWithSubjects[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedCatIds, setExpandedCatIds] = useState<Set<string>>(new Set());
@@ -70,12 +76,12 @@ export function TaxonomyManager({ isOpen, onClose, onTaxonomyChange }: TaxonomyM
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isInline || isOpen) {
       fetchTaxonomy();
     }
-  }, [isOpen]);
+  }, [isInline, isOpen]);
 
-  if (!isOpen) return null;
+  if (!isInline && !isOpen) return null;
 
   const toggleExpand = (catId: string) => {
     setExpandedCatIds((prev) => {
@@ -204,6 +210,288 @@ export function TaxonomyManager({ isOpen, onClose, onTaxonomyChange }: TaxonomyM
     }
   };
 
+  const bodyContent = (
+    <div className="space-y-6">
+      {/* Create New Category Card */}
+      <div className="rounded-xl border border-[#e4e6ef] bg-[#fbfbfd] p-5 shadow-sm">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#3525cd]">
+          Create New Category
+        </h3>
+        <form onSubmit={handleCreateCategory} className="mt-3 flex items-center gap-3">
+          <input
+            type="text"
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            placeholder="Category name (e.g. Cardiology)"
+            className="flex-1 rounded-xl border border-[#dadce5] bg-white px-3.5 py-2.5 text-sm text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
+          />
+          <button
+            type="submit"
+            disabled={isCreatingCategory}
+            className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#3525cd] px-5 text-xs font-semibold text-white transition hover:bg-[#2f20b8] disabled:opacity-60 shrink-0 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            Add Category
+          </button>
+        </form>
+      </div>
+
+      {/* Category Accordion List */}
+      <div>
+        <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#696778]">
+          Existing Categories ({categories.length})
+        </h3>
+
+        {isLoading ? (
+          <div className="flex h-40 items-center justify-center rounded-xl border border-[#e4e6ef] bg-white text-sm text-[#696778]">
+            Loading taxonomy...
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#dadce5] bg-white p-8 text-center text-sm text-[#696778]">
+            No categories found. Create one above to get started.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {categories.map((cat) => {
+              const isExpanded = expandedCatIds.has(cat.id);
+              const isEditing = editingCatId === cat.id;
+
+              return (
+                <div
+                  key={cat.id}
+                  className="overflow-hidden rounded-xl border border-[#e4e6ef] bg-white shadow-sm transition"
+                >
+                  {/* Category Header Row */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#eceef5]">
+                    <div className="flex flex-1 items-center gap-3 min-w-0 pr-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(cat.id)}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#dadce5] text-[#5b5a68] transition hover:bg-[#f7f7fb]"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-[#3525cd]" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+
+                      {isEditing ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <input
+                            type="text"
+                            value={editCatName}
+                            onChange={(e) => setEditCatName(e.target.value)}
+                            className="flex-1 rounded-lg border border-[#3525cd] bg-white px-3 py-1 text-sm font-semibold text-[#191c1e] outline-none"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            disabled={isUpdatingCategory}
+                            onClick={() => handleUpdateCategory(cat.id)}
+                            className="inline-flex h-8 items-center justify-center rounded-lg bg-[#3525cd] px-3 text-xs font-semibold text-white transition hover:bg-[#2f20b8]"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatId(null)}
+                            className="inline-flex h-8 items-center justify-center rounded-lg border border-[#dadce5] px-3 text-xs font-semibold text-[#5b5a68] transition hover:bg-[#f7f7fb]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 truncate">
+                          <span className="text-sm font-bold text-[#191c1e] truncate">
+                            {cat.name}
+                          </span>
+                          <span className="rounded-full bg-[#f1f0ff] px-2 py-0.5 text-[10px] font-bold text-[#3525cd]">
+                            {cat.subjects.length} subject{cat.subjects.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isEditing && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => startEditCategory(cat)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5b5a68] transition hover:bg-[#f7f7fb] hover:text-[#3525cd]"
+                          title="Edit Category"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-[#5b5a68] transition hover:bg-red-50 hover:text-red-600"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Expanded Subjects Area */}
+                  {isExpanded ? (
+                    <div className="bg-[#fbfbfd] p-4 border-t border-[#eceef5] space-y-4">
+                      {/* Subjects List */}
+                      <div>
+                        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#777586]">
+                          Subjects in {cat.name}
+                        </h4>
+
+                        {cat.subjects.length === 0 ? (
+                          <p className="text-xs text-[#8d8b99] italic py-1">
+                            No subjects created yet for this category.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {cat.subjects.map((subj) => {
+                              const isSubjEditing = editingSubjId === subj.id;
+
+                              return (
+                                <div
+                                  key={subj.id}
+                                  className="flex items-center justify-between rounded-lg border border-[#e4e6ef] bg-white px-3 py-2 shadow-xs"
+                                >
+                                  {isSubjEditing ? (
+                                    <div className="flex items-center gap-2 flex-1 mr-2">
+                                      <input
+                                        type="text"
+                                        value={editSubjName}
+                                        onChange={(e) => setEditSubjName(e.target.value)}
+                                        placeholder="Subject name"
+                                        className="flex-1 rounded-lg border border-[#3525cd] bg-white px-2.5 py-1 text-xs font-semibold text-[#191c1e] outline-none"
+                                        autoFocus
+                                      />
+                                      <input
+                                        type="text"
+                                        value={editSubjCode}
+                                        onChange={(e) => setEditSubjCode(e.target.value)}
+                                        placeholder="Code (optional)"
+                                        className="w-24 rounded-lg border border-[#dadce5] bg-white px-2 py-1 text-xs text-[#5b5a68] outline-none"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={isUpdatingSubject}
+                                        onClick={() => handleUpdateSubject(subj.id)}
+                                        className="inline-flex h-7 items-center justify-center rounded-lg bg-[#3525cd] px-2.5 text-xs font-semibold text-white transition hover:bg-[#2f20b8]"
+                                      >
+                                        <Check className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingSubjId(null)}
+                                        className="inline-flex h-7 items-center justify-center rounded-lg border border-[#dadce5] px-2.5 text-xs font-semibold text-[#5b5a68] transition hover:bg-[#f7f7fb]"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Tag className="h-3.5 w-3.5 text-[#3525cd] shrink-0" />
+                                      <span className="text-xs font-bold text-[#191c1e] truncate">
+                                        {subj.name}
+                                      </span>
+                                      {subj.code && (
+                                        <span className="rounded bg-[#f1f0ff] px-1.5 py-0.5 text-[9px] font-bold text-[#3525cd]">
+                                          {subj.code}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {!isSubjEditing && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => startEditSubject(subj)}
+                                        className="flex h-7 w-7 items-center justify-center rounded-md text-[#5b5a68] transition hover:bg-[#f7f7fb] hover:text-[#3525cd]"
+                                        title="Edit Subject"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteSubject(subj.id, subj.name)}
+                                        className="flex h-7 w-7 items-center justify-center rounded-md text-[#5b5a68] transition hover:bg-red-50 hover:text-red-600"
+                                        title="Delete Subject"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Add Subject Form */}
+                      <form
+                        onSubmit={(e) => handleCreateSubject(e, cat.id)}
+                        className="flex items-center gap-2 pt-2 border-t border-[#eceef5]"
+                      >
+                        <input
+                          type="text"
+                          value={newSubjMap[cat.id]?.name || ''}
+                          onChange={(e) =>
+                            setNewSubjMap((prev) => ({
+                              ...prev,
+                              [cat.id]: {
+                                name: e.target.value,
+                                code: prev[cat.id]?.code || '',
+                              },
+                            }))
+                          }
+                          placeholder={`Add subject to ${cat.name}...`}
+                          className="flex-1 rounded-xl border border-[#dadce5] bg-white px-3 py-1.5 text-xs text-[#191c1e] outline-none placeholder:text-[#8d8b99] focus:border-[#3525cd]"
+                        />
+                        <input
+                          type="text"
+                          value={newSubjMap[cat.id]?.code || ''}
+                          onChange={(e) =>
+                            setNewSubjMap((prev) => ({
+                              ...prev,
+                              [cat.id]: {
+                                name: prev[cat.id]?.name || '',
+                                code: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="Code (opt)"
+                          className="w-20 rounded-xl border border-[#dadce5] bg-white px-2.5 py-1.5 text-xs text-[#191c1e] outline-none placeholder:text-[#8d8b99] focus:border-[#3525cd]"
+                        />
+                        <button
+                          type="button"
+                          onClick={(e) => handleCreateSubject(e, cat.id)}
+                          disabled={isCreatingSubjectMap[cat.id]}
+                          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-xl bg-[#3525cd] px-3 text-xs font-semibold text-white transition hover:bg-[#2f20b8] disabled:opacity-60 shrink-0 cursor-pointer"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add Subject
+                        </button>
+                      </form>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isInline) {
+    return bodyContent;
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-sm transition-opacity">
       <div
@@ -223,303 +511,33 @@ export function TaxonomyManager({ isOpen, onClose, onTaxonomyChange }: TaxonomyM
               Manage categories and nested subjects for your quiz catalog.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadce5] text-[#5b5a68] transition hover:bg-[#f7f7fb]"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#dadce5] text-[#5b5a68] transition hover:bg-[#f7f7fb]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Create New Category Card */}
-          <div className="rounded-xl border border-[#e4e6ef] bg-[#fbfbfd] p-4 shadow-sm">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[#3525cd]">
-              Create New Category
-            </h3>
-            <form onSubmit={handleCreateCategory} className="mt-3 flex items-center gap-3">
-              <input
-                type="text"
-                value={newCatName}
-                onChange={(e) => setNewCatName(e.target.value)}
-                placeholder="Category name (e.g. Cardiology)"
-                className="flex-1 rounded-xl border border-[#dadce5] bg-white px-3.5 py-2 text-sm text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#3525cd] focus:ring-2 focus:ring-[#3525cd]/10"
-              />
-              <button
-                type="submit"
-                disabled={isCreatingCategory}
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#3525cd] px-5 text-xs font-semibold text-white transition hover:bg-[#2f20b8] disabled:opacity-60 shrink-0"
-              >
-                <Plus className="h-4 w-4" />
-                Add Category
-              </button>
-            </form>
-          </div>
-
-          {/* Category Accordion List */}
-          <div>
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[#696778]">
-              Existing Categories ({categories.length})
-            </h3>
-
-            {isLoading ? (
-              <div className="flex h-40 items-center justify-center rounded-xl border border-[#e4e6ef] bg-white text-sm text-[#696778]">
-                Loading taxonomy...
-              </div>
-            ) : categories.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[#dadce5] bg-white p-8 text-center text-sm text-[#696778]">
-                No categories found. Create one above to get started.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {categories.map((cat) => {
-                  const isExpanded = expandedCatIds.has(cat.id);
-                  const isEditing = editingCatId === cat.id;
-
-                  return (
-                    <div
-                      key={cat.id}
-                      className="overflow-hidden rounded-xl border border-[#e4e6ef] bg-white shadow-sm transition"
-                    >
-                      {/* Category Header Row */}
-                      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-[#eceef5]">
-                        <div className="flex flex-1 items-center gap-3 min-w-0 pr-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(cat.id)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[#dadce5] text-[#5b5a68] transition hover:bg-[#f7f7fb]"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-[#3525cd]" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </button>
-
-                          {isEditing ? (
-                            <div className="flex flex-1 items-center gap-2">
-                              <input
-                                type="text"
-                                value={editCatName}
-                                onChange={(e) => setEditCatName(e.target.value)}
-                                disabled={isUpdatingCategory}
-                                className="flex-1 rounded-lg border border-[#3525cd] bg-white px-2.5 py-1 text-sm font-semibold text-[#191c1e] outline-none disabled:opacity-60"
-                              />
-                              <button
-                                type="button"
-                                disabled={isUpdatingCategory || !editCatName.trim()}
-                                onClick={() => handleUpdateCategory(cat.id)}
-                                className="inline-flex items-center justify-center rounded-lg bg-[#3525cd] p-1.5 text-white transition hover:bg-[#2f20b8] disabled:opacity-50 min-w-[28px] min-h-[28px]"
-                                title="Save Category"
-                              >
-                                {isUpdatingCategory ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Check className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isUpdatingCategory}
-                                onClick={() => setEditingCatId(null)}
-                                className="rounded-lg border border-[#dadce5] p-1.5 text-[#5b5a68] transition hover:bg-[#f7f7fb] disabled:opacity-50"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="truncate flex items-center gap-2">
-                              <span className="text-sm font-bold text-[#191c1e]">{cat.name}</span>
-                              <span className="rounded-full bg-[#3525cd]/10 px-2 py-0.5 text-[10px] font-bold text-[#3525cd]">
-                                {cat.subjects.length} {cat.subjects.length === 1 ? 'subject' : 'subjects'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {!isEditing ? (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => startEditCategory(cat)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-[#3525cd] hover:bg-[#3525cd]/10 transition"
-                              title="Edit Category"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 transition"
-                              title="Delete Category"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Nested Subjects (Expanded View) */}
-                      {isExpanded ? (
-                        <div className="bg-[#fbfbfd] p-4 space-y-3 border-t border-[#eceef5]">
-                          {/* List of Subjects */}
-                          {cat.subjects.length === 0 ? (
-                            <p className="text-xs text-[#777586] italic">No subjects added yet to this category.</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {cat.subjects.map((subj) => {
-                                const isEditingSubj = editingSubjId === subj.id;
-
-                                return (
-                                  <div
-                                    key={subj.id}
-                                    className="flex items-center justify-between rounded-lg border border-[#e4e6ef] bg-white px-3 py-2 text-xs"
-                                  >
-                                    {isEditingSubj ? (
-                                      <div className="flex flex-1 items-center gap-2 pr-2">
-                                        <input
-                                          type="text"
-                                          value={editSubjName}
-                                          onChange={(e) => setEditSubjName(e.target.value)}
-                                          placeholder="Subject name"
-                                          disabled={isUpdatingSubject}
-                                          className="flex-1 rounded-md border border-[#3525cd] px-2 py-1 text-xs outline-none disabled:opacity-60"
-                                          required
-                                        />
-                                        <input
-                                          type="text"
-                                          value={editSubjCode}
-                                          onChange={(e) => setEditSubjCode(e.target.value)}
-                                          placeholder="e.g., ANA101"
-                                          disabled={isUpdatingSubject}
-                                          className="w-28 rounded-md border border-[#dadce5] bg-[#fbfbfd] px-2 py-1 text-xs text-[#191c1e] outline-none focus:border-[#3525cd] disabled:opacity-60"
-                                          required
-                                        />
-                                        <button
-                                          type="button"
-                                          disabled={isUpdatingSubject || !editSubjName.trim() || !editSubjCode.trim()}
-                                          onClick={() => handleUpdateSubject(subj.id)}
-                                          className="inline-flex items-center justify-center rounded-md bg-[#3525cd] p-1 text-white hover:bg-[#2f20b8] disabled:opacity-50 min-w-[24px] min-h-[24px]"
-                                          title="Save Subject"
-                                        >
-                                          {isUpdatingSubject ? (
-                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                          ) : (
-                                            <Check className="h-3 w-3" />
-                                          )}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={isUpdatingSubject}
-                                          onClick={() => setEditingSubjId(null)}
-                                          className="rounded-md border border-[#dadce5] p-1 text-[#5b5a68] disabled:opacity-50"
-                                        >
-                                          <X className="h-3 w-3" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center gap-2">
-                                        <BookOpen className="h-3.5 w-3.5 text-[#3525cd]" />
-                                        <span className="font-semibold text-[#191c1e]">{subj.name}</span>
-                                        {subj.code ? (
-                                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[#f1f0ff] px-2 py-0.5 text-[10px] font-bold text-[#3525cd]">
-                                            <Tag className="h-2.5 w-2.5" />
-                                            {subj.code}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    )}
-
-                                    {!isEditingSubj ? (
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          onClick={() => startEditSubject(subj)}
-                                          className="p-1 text-[#3525cd] hover:bg-[#3525cd]/10 rounded transition"
-                                          title="Edit Subject"
-                                        >
-                                          <Pencil className="h-3 w-3" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDeleteSubject(subj.id, subj.name)}
-                                          className="p-1 text-red-600 hover:bg-red-50 rounded transition"
-                                          title="Delete Subject"
-                                        >
-                                          <Trash2 className="h-3 w-3" />
-                                        </button>
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          {/* Add Subject Inline Form */}
-                          <form
-                            onSubmit={(e) => handleCreateSubject(e, cat.id)}
-                            className="flex items-center gap-2 pt-2 border-t border-[#eceef5]"
-                          >
-                            <input
-                              type="text"
-                              value={newSubjMap[cat.id]?.name || ''}
-                              onChange={(e) =>
-                                setNewSubjMap((prev) => ({
-                                  ...prev,
-                                  [cat.id]: { ...(prev[cat.id] || { code: '' }), name: e.target.value },
-                                }))
-                              }
-                              placeholder="Subject name (e.g. Anatomy)"
-                              className="flex-1 rounded-lg border border-[#dadce5] bg-white px-3 py-1.5 text-xs text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#3525cd]"
-                              required
-                            />
-                            <input
-                              type="text"
-                              value={newSubjMap[cat.id]?.code || ''}
-                              onChange={(e) =>
-                                setNewSubjMap((prev) => ({
-                                  ...prev,
-                                  [cat.id]: { ...(prev[cat.id] || { name: '' }), code: e.target.value },
-                                }))
-                              }
-                              placeholder="e.g., ANA101"
-                              className="w-32 rounded-lg border border-[#dadce5] bg-[#fbfbfd] px-3 py-1.5 text-xs text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#3525cd] focus:ring-1 focus:ring-[#3525cd]/20"
-                              required
-                            />
-                            <button
-                              type="submit"
-                              disabled={
-                                isCreatingSubjectMap[cat.id] ||
-                                !(newSubjMap[cat.id]?.name?.trim() && newSubjMap[cat.id]?.code?.trim())
-                              }
-                              className="inline-flex items-center gap-1 rounded-lg bg-[#3525cd] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#2f20b8] disabled:opacity-60 shrink-0"
-                            >
-                              <Plus className="h-3 w-3" />
-                              Add Subject
-                            </button>
-                          </form>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {bodyContent}
         </div>
 
         {/* Modal Footer */}
         <div className="border-t border-[#e4e6ef] px-6 py-4 bg-[#fbfbfd] flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-[#dadce5] bg-white px-5 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-          >
-            Close
-          </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-[#dadce5] bg-white px-5 py-2 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
     </div>
