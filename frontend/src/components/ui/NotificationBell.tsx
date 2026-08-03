@@ -182,17 +182,18 @@ export function NotificationBell() {
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
-    if (!userId || unreadCount === 0) return;
+    const activeUserId = resolvedUserId || currentUser?.id;
+    if (!activeUserId || unreadCount === 0) return;
 
     // Optimistic UI update
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
 
     try {
-      await markAllNotificationsReadAction(userId);
+      await markAllNotificationsReadAction(activeUserId);
     } catch (err: unknown) {
       console.error('Error marking all notifications read:', err);
     }
-  }, [userId, unreadCount]);
+  }, [resolvedUserId, currentUser?.id, unreadCount]);
 
   return (
     <div ref={containerRef} className="relative inline-block text-left">
