@@ -45,6 +45,7 @@ interface AdminQuiz {
   duration_sec?: number | null;
   is_published?: boolean | null;
   credit_cost?: number | null;
+  created_at?: string | null;
   category?: QuizCategoryRelation;
 }
 
@@ -525,6 +526,7 @@ export default function AdminQuizzesPage() {
                   <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Duration</th>
                   <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Category</th>
                   <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Status</th>
+                  <th className="px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Created Date</th>
                   <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-[0.14em] text-[#696778]">Actions</th>
                 </tr>
               </thead>
@@ -533,6 +535,13 @@ export default function AdminQuizzesPage() {
                   const isPublished = Boolean(quiz.is_published);
                   const categoryName = getCategoryName(quiz.category);
                   const subjectName = getSubjectName(quiz.subject);
+                  const formattedDate = quiz.created_at
+                    ? new Date(quiz.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : 'Recently';
 
                   return (
                     <tr key={quiz.id} className="group transition hover:bg-[#fbfbfd]">
@@ -591,6 +600,9 @@ export default function AdminQuizzesPage() {
                           />
                           {isPublished ? 'Published' : 'Draft'}
                         </button>
+                      </td>
+                      <td className="px-5 py-3 text-xs font-medium text-[#696778]">
+                        {formattedDate}
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-1">

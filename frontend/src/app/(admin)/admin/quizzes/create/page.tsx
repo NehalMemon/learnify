@@ -11,6 +11,7 @@ import {
   type QuizCategoryWithSubjects,
   type QuizSubject,
 } from "@/app/actions/taxonomyActions";
+import { saveQuizDraft } from "@/app/actions/quizAdminActions";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -87,6 +88,32 @@ export default function CreateQuizPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
+
+  const handleSaveDraft = async () => {
+    setIsDrafting(true);
+    try {
+      const title = getValues("title") || "Untitled Draft Quiz";
+      const categoryId = getValues("categoryId");
+
+      const res = await saveQuizDraft({
+        title,
+        categoryId,
+      });
+
+      if (res.success) {
+        toast.success("Draft saved!");
+        router.push("/admin/quizzes");
+      } else {
+        toast.error(res.error || "Failed to save draft.");
+      }
+    } catch (err) {
+      console.error("Draft Error:", err);
+      toast.error("Failed to save draft.");
+    } finally {
+      setIsDrafting(false);
+    }
+  };
 
   /* ── React Hook Form ─────────────────────────────────────────── */
   const {
@@ -395,10 +422,11 @@ export default function CreateQuizPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => toast.success("Draft saved!")}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-900"
+            onClick={handleSaveDraft}
+            disabled={isDrafting}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-900 disabled:opacity-50 cursor-pointer"
           >
-            Save Draft
+            {isDrafting ? "Saving Draft..." : "Save Draft"}
           </button>
           <button
             type="submit"

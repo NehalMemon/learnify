@@ -5,8 +5,8 @@ import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import { Save, AlertCircle, Sparkles } from 'lucide-react';
-import Link from 'next/link';
-import { createQuiz, addQuestionsToQuiz } from '@/app/actions/quizAdminActions';
+import { useRouter } from 'next/navigation';
+import { createQuiz, addQuestionsToQuiz, saveQuizDraft } from '@/app/actions/quizAdminActions';
 import { quizApi } from '@/lib/api';
 
 import { QuizSidebar } from '@/components/admin/quiz/QuizSidebar';
@@ -19,6 +19,7 @@ interface Category {
 }
 
 export default function QuizBuilderPage() {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -151,6 +152,33 @@ export default function QuizBuilderPage() {
     toast.error('Please fix the errors in your questions before saving.');
   };
 
+  const handleSaveDraft = async () => {
+    setIsSaving(true);
+    try {
+      const title = watch('title') || 'Untitled Draft Quiz';
+      const categoryId = watch('categoryId');
+      const durationSec = watch('durationSec');
+
+      const res = await saveQuizDraft({
+        title,
+        categoryId,
+        duration_sec: durationSec ? Number(durationSec) : 3600,
+      });
+
+      if (res.success) {
+        toast.success('Draft saved!');
+        router.push('/admin/quizzes');
+      } else {
+        toast.error(res.error || 'Failed to save draft.');
+      }
+    } catch (err) {
+      console.error('Draft Error:', err);
+      toast.error('Failed to save draft.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit as unknown as SubmitHandler<any>, onInvalid)}
@@ -211,9 +239,17 @@ export default function QuizBuilderPage() {
             ✨ Generate Quiz with AI
           </Link>
           <button
+            type="button"
+            onClick={handleSaveDraft}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            Save Draft
+          </button>
+          <button
             type="submit"
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all shadow-sm cursor-pointer"
           >
             <Save className="h-4 w-4" />
             {isSaving ? 'Saving...' : 'Save Quiz'}
