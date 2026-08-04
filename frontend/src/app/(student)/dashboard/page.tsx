@@ -116,8 +116,11 @@ const fallbackRecommendations: RecommendationItem[] = [
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-      <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${clampProgress(value)}%` }} />
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-150 bg-slate-100">
+      <div
+        className="h-full rounded-full bg-slate-900 transition-all duration-500 ease-out"
+        style={{ width: `${clampProgress(value)}%` }}
+      />
     </div>
   )
 }
@@ -126,27 +129,35 @@ function ContinueLearningCard({ item }: { item: ContinueItem }) {
   const Icon = item.icon
 
   return (
-    <article className="min-w-[280px] rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm md:min-w-0">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
-            <Icon className="h-5 w-5" aria-hidden="true" />
+    <article className="group relative flex min-w-[280px] flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md md:min-w-0">
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-900 transition-colors group-hover:bg-slate-900 group-hover:text-white">
+              <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <span className="inline-block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {item.eyebrow}
+              </span>
+              <h3 className="mt-0.5 line-clamp-2 text-base font-bold text-slate-900 group-hover:text-slate-950">
+                {item.title}
+              </h3>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{item.eyebrow}</p>
-            <h3 className="mt-1 line-clamp-2 text-base font-bold leading-6 text-slate-950">{item.title}</h3>
-          </div>
+          <span className="shrink-0 text-xs font-extrabold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+            {item.progress}%
+          </span>
         </div>
-        <span className="shrink-0 text-sm font-bold text-blue-700">{item.progress}%</span>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-6 space-y-3">
         <ProgressBar value={item.progress} />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-500">Keep the streak moving</p>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <span className="text-xs font-medium text-slate-500">In progress</span>
           <Link
             href={item.href}
-            className="inline-flex h-9 items-center justify-center rounded-md bg-slate-950 px-4 text-sm font-bold text-white transition hover:bg-blue-700"
+            className="inline-flex h-8.5 items-center justify-center rounded-lg bg-slate-900 px-3.5 text-xs font-bold text-white transition-all duration-150 hover:bg-slate-800 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950"
           >
             Resume
           </Link>
@@ -163,30 +174,38 @@ function RecommendationCard({ item }: { item: RecommendationItem }) {
   return (
     <Link
       href={item.href}
-      className="group block rounded-md border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-sm"
+      className="group flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${isCourse ? 'bg-purple-50 text-purple-700' : 'bg-emerald-50 text-emerald-700'}`}>
-          <Icon className="h-5 w-5" aria-hidden="true" />
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-900 group-hover:bg-slate-900 group-hover:text-white transition-colors">
+            <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+          </div>
+          <Badge className="bg-slate-100 text-slate-800 border border-slate-200/80 text-[11px] font-semibold tracking-wide hover:bg-slate-200">
+            {item.type}
+          </Badge>
         </div>
-        <Badge className={isCourse ? 'bg-purple-100 text-purple-700 hover:bg-purple-100' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'}>
-          {item.type}
-        </Badge>
-      </div>
 
-      <div className="mt-5">
-        <h3 className="line-clamp-2 min-h-12 text-base font-bold leading-6 text-slate-950">{item.title}</h3>
-        <p className="mt-1 text-sm text-slate-600">{item.subtitle}</p>
+        <div className="mt-4">
+          <h3 className="line-clamp-2 text-base font-bold text-slate-900 group-hover:text-slate-950">
+            {item.title}
+          </h3>
+          <p className="mt-1 text-xs text-slate-500 line-clamp-1">{item.subtitle}</p>
+        </div>
       </div>
 
       <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3">
-        <span className="inline-flex items-center gap-1 text-sm font-semibold text-slate-700">
-          {isCourse ? <Star className="h-4 w-4 fill-amber-400 text-amber-400" /> : <Clock3 className="h-4 w-4 text-emerald-600" />}
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          {isCourse ? (
+            <Star className="h-3.5 w-3.5 fill-slate-900 text-slate-900" />
+          ) : (
+            <Clock3 className="h-3.5 w-3.5 text-slate-700" />
+          )}
           {item.metric}
         </span>
-        <span className="inline-flex items-center gap-1 text-sm font-bold text-blue-700">
-          Open
-          <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden="true" />
+        <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-900 group-hover:translate-x-0.5 transition-transform">
+          Explore
+          <ChevronRight className="h-3.5 w-3.5 text-slate-700" aria-hidden="true" />
         </span>
       </div>
     </Link>
@@ -195,14 +214,14 @@ function RecommendationCard({ item }: { item: RecommendationItem }) {
 
 function MetricCard({ label, value, icon: Icon }: { label: string; value: string | number; icon: LucideIcon }) {
   return (
-    <Card className="rounded-md border-slate-200 bg-white shadow-sm">
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-          <Icon className="h-5 w-5" aria-hidden="true" />
+    <Card className="rounded-xl border-slate-200/80 bg-white shadow-sm transition-all duration-200 hover:border-slate-300">
+      <CardContent className="flex items-center gap-3.5 p-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-50 text-slate-900">
+          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="text-xl font-black text-slate-950">{value}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+          <p className="text-xl font-extrabold tracking-tight text-slate-950">{value}</p>
         </div>
       </CardContent>
     </Card>
@@ -330,7 +349,8 @@ export default function StudentDashboardPage() {
     }
   }, [])
 
-  const isPendingApproval = user?.role === 'STUDENT' && !user?.learnifyEnabled && !user?.doctorsQuizzEnabled
+  const u = user as (typeof user & { learnifyEnabled?: boolean; doctorsQuizzEnabled?: boolean }) | null
+  const isPendingApproval = user?.role === 'STUDENT' && !u?.learnifyEnabled && !u?.doctorsQuizzEnabled
 
   const continueItems = useMemo<ContinueItem[]>(() => {
     const activeEnrollments = state.enrollments
@@ -416,61 +436,65 @@ export default function StudentDashboardPage() {
   }, [state.attempts])
 
   return (
-    <main className="space-y-6 text-gray-900">
+    <main className="space-y-8 font-sans text-slate-900 antialiased">
       <Toaster position="top-center" toastOptions={{ style: { background: '#0f172a', color: '#fff' } }} />
 
       {isPendingApproval && (
-        <div className="mb-5 flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm transition-all animate-in fade-in slide-in-from-top-2">
-          <Info className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <div className="flex items-start gap-3.5 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-900 shadow-sm transition-all">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
           <div>
-            <h2 className="font-bold">Account pending admin approval</h2>
-            <p className="mt-1 text-sm text-amber-800">
+            <h2 className="font-bold text-sm text-amber-950">Account Pending Admin Approval</h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-amber-800">
               Your dashboard is ready. Full access to courses and quizzes unlocks once an administrator approves your account.
             </p>
           </div>
         </div>
       )}
 
-      <section className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* Hero Welcome Section */}
+      <section className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-6">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-purple-600">Learning hub</p>
-          <h1 className="page-title mt-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Student Portal
+          </span>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">
             Welcome back, {displayName}
           </h1>
-          <p className="page-subtitle mt-2 text-sm">
-            Resume your current work, jump into practice, or pick the next recommended module.
+          <p className="mt-1 text-xs text-slate-600 max-w-xl leading-relaxed">
+            Resume your learning path, track topic progress, or explore recommended academic modules.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-          <Avatar className="h-11 w-11">
-            <AvatarFallback className="bg-blue-100 font-bold text-blue-700">
+        <div className="flex items-center gap-3.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm">
+          <Avatar className="h-10 w-10 border border-slate-200">
+            <AvatarFallback className="bg-slate-900 text-xs font-bold text-white">
               {displayName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-bold text-slate-950">{displayName}</p>
-            <p className="text-xs text-slate-500">{user?.email ?? 'Ready to learn'}</p>
+            <p className="text-xs font-bold text-slate-950">{displayName}</p>
+            <p className="text-[11px] font-medium text-slate-500">{user?.email ?? 'Active Student'}</p>
           </div>
         </div>
       </section>
 
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      {/* Continue Learning */}
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-slate-950">Continue Learning</h2>
-            <p className="text-sm text-slate-600">Your highest-priority items in progress.</p>
+            <h2 className="text-lg font-extrabold text-slate-950 tracking-tight">Continue Learning</h2>
+            <p className="text-xs text-slate-500">Your highest-priority active modules.</p>
           </div>
-          <Link href="/my-courses" className="hidden items-center gap-1 text-sm font-bold text-blue-700 hover:text-blue-900 sm:inline-flex">
+          <Link href="/my-courses" className="inline-flex items-center gap-1 text-xs font-bold text-slate-900 hover:text-slate-700 transition-colors">
             View all
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
           </Link>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {[0, 1, 2].map((item) => (
-              <div key={item} className="h-40 animate-pulse rounded-md border border-slate-200 bg-white" />
+              <div key={item} className="h-40 animate-pulse rounded-xl border border-slate-200/80 bg-white" />
             ))}
           </div>
         ) : (
@@ -482,23 +506,24 @@ export default function StudentDashboardPage() {
         )}
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_320px]">
+      {/* Recommendations & Side Metrics */}
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1fr_300px]">
         <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-black text-slate-950">Recommended for you</h2>
-              <p className="text-sm text-slate-600">A mix of courses and quizzes based on your available catalog.</p>
+              <h2 className="text-lg font-extrabold text-slate-950 tracking-tight">Recommended for You</h2>
+              <p className="text-xs text-slate-500">Curated academic modules and practice exams.</p>
             </div>
-            <Link href="/dashboard/courses" className="hidden items-center gap-1 text-sm font-bold text-blue-700 hover:text-blue-900 sm:inline-flex">
+            <Link href="/dashboard/courses" className="inline-flex items-center gap-1 text-xs font-bold text-slate-900 hover:text-slate-700 transition-colors">
               Browse catalog
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
           </div>
 
           {loading ? (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {[0, 1, 2, 3].map((item) => (
-                <div key={item} className="h-48 animate-pulse rounded-md border border-slate-200 bg-white" />
+                <div key={item} className="h-48 animate-pulse rounded-xl border border-slate-200/80 bg-white" />
               ))}
             </div>
           ) : (
@@ -510,44 +535,46 @@ export default function StudentDashboardPage() {
           )}
         </div>
 
-        <aside className="space-y-4">
-          <Card className="rounded-md border-slate-200 bg-white shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Sparkles className="h-4 w-4 text-blue-700" aria-hidden="true" />
+        <aside className="space-y-5">
+          <Card className="rounded-xl border-slate-200/80 bg-white shadow-sm">
+            <CardHeader className="pb-3 pt-5 px-5">
+              <CardTitle className="flex items-center gap-2 text-sm font-extrabold text-slate-950">
+                <Sparkles className="h-4 w-4 text-slate-900" aria-hidden="true" />
                 Today&apos;s Focus
               </CardTitle>
-              <CardDescription>Small actions that keep momentum visible.</CardDescription>
+              <CardDescription className="text-xs text-slate-500">
+                Quick actions to maintain daily learning momentum.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2.5 px-5 pb-5">
               <Link
                 href="/dashboard/quizzes"
-                className="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-bold transition hover:border-blue-200 hover:bg-blue-50"
+                className="flex items-center justify-between rounded-lg border border-slate-200/80 p-3 text-xs font-bold text-slate-900 transition-all hover:border-slate-300 hover:bg-slate-50"
               >
                 Start a timed quiz
-                <PlayCircle className="h-4 w-4 text-blue-700" aria-hidden="true" />
+                <PlayCircle className="h-4 w-4 text-slate-900" aria-hidden="true" />
               </Link>
               <Link
                 href="/dashboard/courses"
-                className="flex items-center justify-between rounded-md border border-slate-200 p-3 text-sm font-bold transition hover:border-blue-200 hover:bg-blue-50"
+                className="flex items-center justify-between rounded-lg border border-slate-200/80 p-3 text-xs font-bold text-slate-900 transition-all hover:border-slate-300 hover:bg-slate-50"
               >
                 Find next lesson
-                <ChevronRight className="h-4 w-4 text-blue-700" aria-hidden="true" />
+                <ChevronRight className="h-4 w-4 text-slate-900" aria-hidden="true" />
               </Link>
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-            <MetricCard label="Avg. progress" value={`${averageProgress}%`} icon={Target} />
-            <MetricCard label="Quiz average" value={`${averageScore}%`} icon={BarChart3} />
+            <MetricCard label="Avg. Progress" value={`${averageProgress}%`} icon={Target} />
+            <MetricCard label="Quiz Score" value={`${averageScore}%`} icon={BarChart3} />
             <MetricCard label="Attempts" value={state.attempts.length} icon={ClipboardList} />
           </div>
 
-          <Card className="rounded-md border-slate-200 bg-white shadow-sm">
+          <Card className="rounded-xl border-slate-200/80 bg-white shadow-sm">
             <CardContent className="flex items-start gap-3 p-4">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-              <p className="text-sm leading-6 text-slate-600">
-                Best next step: finish one lesson, then take one short quiz while the concept is fresh.
+              <CheckCircle2 className="mt-0.5 h-4.5 w-4.5 shrink-0 text-slate-900" aria-hidden="true" />
+              <p className="text-xs leading-relaxed font-medium text-slate-600">
+                Recommended step: finish one course lesson, then complete a practice quiz to reinforce key concepts.
               </p>
             </CardContent>
           </Card>

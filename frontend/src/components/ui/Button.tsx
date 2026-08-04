@@ -5,20 +5,20 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/20 focus-visible:border-purple-500 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-transparent font-medium whitespace-nowrap transition-colors outline-none select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:border-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-purple-600 text-white hover:bg-purple-700",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
         outline:
-          "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+          "border-border bg-background text-foreground hover:bg-muted hover:text-foreground shadow-xs",
         secondary:
-          "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
-          "text-gray-600 hover:bg-gray-100",
+          "text-muted-foreground hover:bg-muted hover:text-foreground",
         destructive:
-          "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-        link: "text-purple-600 underline-offset-4 hover:underline",
+          "bg-destructive/10 border-destructive/20 text-destructive hover:bg-destructive/20 focus-visible:ring-destructive/30",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "min-h-[44px] px-4 py-2 text-sm",

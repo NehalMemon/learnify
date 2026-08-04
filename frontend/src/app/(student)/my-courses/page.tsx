@@ -22,10 +22,10 @@ interface Enrollment {
   createdAt: string;
 }
 
-const STATUS_VARIANT: Record<string, 'success' | 'purple' | 'danger' | 'warning'> = {
-  ACTIVE: 'success',
-  COMPLETED: 'purple',
-  CANCELLED: 'danger',
+const STATUS_STYLE: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; className: string }> = {
+  ACTIVE: { variant: 'default', className: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' },
+  COMPLETED: { variant: 'secondary', className: 'bg-slate-900 text-white hover:bg-slate-800' },
+  CANCELLED: { variant: 'destructive', className: 'bg-rose-50 text-rose-700 border-rose-200' },
 };
 
 const CourseSkeleton = () => (
@@ -56,7 +56,9 @@ export default function MyCoursesPage() {
     const fetchEnrollments = async () => {
       try {
         const response = await enrollmentsApi.getMyEnrollments();
-        if (!cancelled) setEnrollments(response.data.data || []);
+        if (!cancelled) setEnrollments(response?.data?.data || response?.data || []);
+      } catch {
+        if (!cancelled) setEnrollments([]);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -126,7 +128,10 @@ export default function MyCoursesPage() {
 
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <Badge variant={STATUS_VARIANT[enrollment.status] ?? 'warning'}>
+                    <Badge
+                      variant={STATUS_STYLE[enrollment.status]?.variant ?? 'outline'}
+                      className={STATUS_STYLE[enrollment.status]?.className}
+                    >
                       {enrollment.status}
                     </Badge>
                     <span className="text-xs text-muted-foreground">

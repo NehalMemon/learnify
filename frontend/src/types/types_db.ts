@@ -31,7 +31,6 @@ export interface Database {
           has_seen_quiz_disclaimer: boolean;
           university_program: string | null;
           study_year: number | null;
-          access_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -46,7 +45,6 @@ export interface Database {
           has_seen_quiz_disclaimer?: boolean;
           university_program?: string | null;
           study_year?: number | null;
-          access_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,7 +59,6 @@ export interface Database {
           has_seen_quiz_disclaimer?: boolean;
           university_program?: string | null;
           study_year?: number | null;
-          access_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -70,36 +67,36 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          amount: number;
+          package_name: string | null;
+          credits_requested: number;
           status: CreditRequestStatus;
-          reason: string | null;
           proof_image_url: string | null;
-          reviewed_by: string | null;
-          reviewed_at: string | null;
+          resolved_by: string | null;
+          resolved_at: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
-          amount: number;
+          package_name?: string | null;
+          credits_requested: number;
           status?: CreditRequestStatus;
-          reason?: string | null;
           proof_image_url?: string | null;
-          reviewed_by?: string | null;
-          reviewed_at?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
-          amount?: number;
+          package_name?: string | null;
+          credits_requested?: number;
           status?: CreditRequestStatus;
-          reason?: string | null;
           proof_image_url?: string | null;
-          reviewed_by?: string | null;
-          reviewed_at?: string | null;
+          resolved_by?: string | null;
+          resolved_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -130,6 +127,38 @@ export interface Database {
           message?: string;
           metadata?: Json | null;
           user_id?: string | null;
+          created_at?: string;
+        };
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          message: string;
+          type: string;
+          link: string | null;
+          is_read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          message: string;
+          type: string;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          title?: string;
+          message?: string;
+          type?: string;
+          link?: string | null;
+          is_read?: boolean;
           created_at?: string;
         };
       };

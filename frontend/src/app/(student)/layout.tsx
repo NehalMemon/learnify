@@ -6,14 +6,13 @@ import { usePathname } from 'next/navigation';
 import { AlertTriangle, Lock } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav';
 import { createClient } from '@/utils/supabase/client';
 
 /**
  * Student Layout
  *
- * Mobile (< lg): hamburger + slide-out sidebar, bottom tab bar
- * Desktop (lg+): fixed sidebar, no bottom nav
+ * Mobile (< lg): hamburger + slide-out sidebar
+ * Desktop (lg+): fixed sidebar
  */
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -96,7 +95,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           </div>
         )}
 
-        <main className="page-container flex-1 pb-24 lg:pb-8">
+        <main className="page-container flex-1 pb-8">
           <div className="mx-auto w-full max-w-5xl">
             {isInactive && !isAllowedPathWhenInactive ? (
               <div className="my-12 flex flex-col items-center justify-center rounded-3xl border border-red-200 bg-white p-12 text-center shadow-sm">
@@ -116,10 +115,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
             )}
           </div>
         </main>
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-sm lg:hidden">
-        <MobileBottomNav />
       </div>
     </div>
   );

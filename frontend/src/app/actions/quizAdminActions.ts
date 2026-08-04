@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 
 interface QuizCreateInput {
@@ -30,78 +29,6 @@ interface QuizQuestionInput {
   option_d?: string | null;
   correct_option?: string | null;
   explanation?: string | null;
-}
-
-export interface SaveQuizDraftInput {
-  id?: string;
-  categoryId?: string | null;
-  subjectId?: string | null;
-  title?: string;
-  year?: number;
-  duration_sec?: number;
-}
-
-/**
- * Server Action: saveQuizDraft
- * Saves or updates a quiz draft with is_published: false.
- */
-export async function saveQuizDraft(draftData: SaveQuizDraftInput) {
-  try {
-    const supabase = await createClient();
-
-    const dataToInsert = {
-      category_id: draftData.categoryId || null,
-      subject_id: draftData.subjectId || null,
-      title: draftData.title?.trim() || 'Untitled Draft Quiz',
-      year: draftData.year ?? 1,
-      duration_sec: draftData.duration_sec ?? 3600,
-      is_published: false,
-    };
-
-    console.log('Draft Data:', dataToInsert);
-
-    let result;
-    if (draftData.id) {
-      const { data, error } = await supabase
-        .from('quizzes')
-        .update(dataToInsert)
-        .eq('id', draftData.id)
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Draft Error:', error);
-        return { success: false, error: error.message };
-      }
-      result = data;
-    } else {
-      const { data, error } = await supabase
-        .from('quizzes')
-        .insert([dataToInsert])
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Draft Error:', error);
-        return { success: false, error: error.message };
-      }
-      result = data;
-    }
-
-    try {
-      revalidatePath('/admin/quizzes');
-    } catch {
-      // non-fatal
-    }
-
-    return { success: true, data: result };
-  } catch (error) {
-    console.error('Draft Error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to save draft.',
-    };
-  }
 }
 
 export async function createQuiz(quizData: QuizCreateInput) {
@@ -178,29 +105,17 @@ export async function addQuestionsToQuiz(quizId: string, questions: QuizQuestion
   }
 }
 
-export async function publishQuiz(quizId: string, creditCost: number = 0) {
+export async function publishQuiz(quizId: string) {
   try {
     const supabase = await createClient();
     const { error } = await supabase
       .from('quizzes')
-      .update({
-        is_published: true,
-        credit_cost: creditCost,
-      })
+      .update({ is_published: true })
       .eq('id', quizId);
 
     if (error) {
       console.error('publishQuiz error:', error);
       throw new Error(error.message);
-    }
-
-    try {
-      revalidatePath('/admin/quizzes');
-      revalidatePath('/admin/dashboard');
-      revalidatePath('/dashboard');
-      revalidatePath('/student/dashboard');
-    } catch (revalErr) {
-      console.error('publishQuiz revalidate error (non-fatal):', revalErr);
     }
 
     return { success: true };

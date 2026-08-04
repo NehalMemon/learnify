@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, ShieldCheck } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { authApi, getUser } from '@/lib/api';
 import { createClient as createSupabaseClient } from '@/utils/supabase/client';
@@ -46,18 +46,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return;
       }
 
-      // 1. Check Supabase Auth first (prevents unnecessary legacy API network errors)
+      // 1. Check Supabase Auth & Users DB first (prevents unnecessary legacy API network errors)
       try {
         const supabase = createSupabaseClient();
-        const { data } = await supabase.auth.getUser();
-        const sbUser = data?.user;
-        const role = sbUser?.app_metadata?.role || sbUser?.user_metadata?.role;
+        const { data: { user: sbUser } } = await supabase.auth.getUser();
 
-        if (sbUser && (role === 'ADMIN' || sbUser.role === 'authenticated')) {
-          if (!isMounted) return;
-          setNetworkError(false);
-          setIsLoading(false);
-          return;
+        if (sbUser) {
+          const metaRole = sbUser?.app_metadata?.role || sbUser?.user_metadata?.role;
+          if (metaRole === 'ADMIN') {
+            if (!isMounted) return;
+            setNetworkError(false);
+            setIsLoading(false);
+            return;
+          }
+
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', sbUser.id)
+            .single();
+
+          if (profile?.role === 'ADMIN' || sbUser.role === 'authenticated') {
+            if (!isMounted) return;
+            setNetworkError(false);
+            setIsLoading(false);
+            return;
+          }
         }
       } catch (sbError) {
         console.error('ADMIN PAGE FETCH ERROR (Supabase check):', sbError);
@@ -66,9 +80,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       // 2. Fall back to legacy backend API if Supabase user is not found
       try {
         const res = await withTimeout(authApi.getMe(), ADMIN_VERIFY_TIMEOUT_MS);
-        const userData: AdminUser = res.data?.user ?? res.data?.data?.user ?? res.data ?? res;
-
         if (!isMounted) return;
+
+        if (res?.isNetworkError) {
+          // If legacy API is offline but user is authenticated, keep session alive
+          setNetworkError(false);
+          return;
+        }
+
+        const userData: AdminUser = res.data?.user ?? res.data?.data?.user ?? res.data ?? res;
 
         if (userData?.role !== 'ADMIN') {
           router.replace('/dashboard');
@@ -77,10 +97,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         setNetworkError(false);
       } catch (error) {
-        console.error('ADMIN PAGE FETCH ERROR:', error);
-
         if (!isMounted) return;
 
+        const isNetworkError = (error as AxiosError)?.code === 'ERR_NETWORK' || !(error as AxiosError)?.response;
         const status = (error as AxiosError)?.response?.status;
 
         if (status === 401 || status === 403 || status === 400) {
@@ -88,7 +107,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return;
         }
 
-        setNetworkError(true);
+        if (isNetworkError) {
+          console.warn('Backend API is offline or unreachable (legacy auth check skipped).');
+          setNetworkError(false);
+        } else {
+          console.error('ADMIN PAGE FETCH ERROR:', error);
+          setNetworkError(true);
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -151,37 +176,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
-        className="hidden lg:flex"
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={() => setIsMobileSidebarOpen(false)}
       />
 
       {isMobileSidebarOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close admin sidebar overlay"
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setIsMobileSidebarOpen(false)}
-          />
-          <div className="absolute left-0 top-0 h-full w-[85vw] max-w-xs border-r border-gray-200 bg-white shadow-sm">
-            <div className="flex justify-end p-2">
-              <button
-                type="button"
-                onClick={() => setIsMobileSidebarOpen(false)}
-                aria-label="Close admin menu"
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <AdminSidebar
-              className="!static !h-[calc(100%-56px)] !w-full !border-r-0"
-              onMobileClose={() => setIsMobileSidebarOpen(false)}
-            />
-          </div>
-        </div>
+        <button
+          type="button"
+          aria-label="Close admin sidebar overlay"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
       ) : null}
 
-      <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:ml-[88px]' : 'lg:ml-64'}`}>
+      <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-[88px]' : 'lg:pl-64'}`}>
         <AdminTopNav onMobileMenuToggle={() => setIsMobileSidebarOpen(true)} />
         <main className="page-container">{children}</main>
       </div>

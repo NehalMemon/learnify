@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ClipboardList, ChevronDown, Settings, LogOut, Menu } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/AuthProvider';
 import { SearchBar } from '@/components/shared/SearchBar';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 export const AdminTopNav = ({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void }) => {
   const { user, logout } = useAuthContext();
@@ -25,7 +26,9 @@ export const AdminTopNav = ({ onMobileMenuToggle }: { onMobileMenuToggle?: () =>
           <SearchBar variant="admin" className="w-full max-w-md" />
         </div>
 
-        <div className="ml-6 flex items-center gap-4">
+        <div className="ml-6 flex items-center gap-3">
+          <NotificationBell />
+
           <Link
             href="/admin/logs"
             className="flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900"
