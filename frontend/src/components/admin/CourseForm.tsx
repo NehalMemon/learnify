@@ -35,7 +35,7 @@ const courseSchema = z.object({
     .max(2000, 'Description must be at most 2000 characters.'),
 
   courseType: z.enum(COURSE_TYPES, {
-    errorMap: () => ({ message: 'Please select a valid course type.' }),
+    message: 'Please select a valid course type.',
   }),
 
   category: z.string().trim().max(100).optional().or(z.literal('')),
@@ -47,7 +47,7 @@ const courseSchema = z.object({
     .max(150, 'Instructor name must be at most 150 characters.'),
 
   price: z
-    .number({ invalid_type_error: 'Price must be a number.' })
+    .number({ message: 'Price must be a number.' })
     .min(0, 'Price cannot be negative.')
     .max(999999, 'Price value is too large.'),
 

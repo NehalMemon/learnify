@@ -20,6 +20,8 @@ export interface User {
   status: UserStatus;
   credits: number;
   hasSeenQuizDisclaimer?: boolean;
+  learnifyEnabled?: boolean;
+  doctorsQuizzEnabled?: boolean;
   universityProgram?: string | null;
   studyYear?: number;
   accessExpiresAt?: string | Date | null;
@@ -32,12 +34,15 @@ export type CreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export interface CreditRequest {
   id: string;
   userId: string;
-  amount: number;
+  amount?: number;
+  creditsRequested?: number;
   status: CreditRequestStatus;
   reason?: string | null;
   proofImageUrl?: string | null;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   user?: User;

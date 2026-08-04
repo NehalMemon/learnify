@@ -9,7 +9,7 @@ interface QuizCardProps {
 }
 
 export default function QuizCard({ quiz, viewMode = 'grid' }: QuizCardProps) {
-  const formatCategory = (text: string, maxLength = 12) => {
+  const formatCategory = (text?: string, maxLength = 12) => {
     if (!text) return "Category";
     return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
   };

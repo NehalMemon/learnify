@@ -64,7 +64,7 @@ function formatTimer(totalSeconds: number): string {
 
 function normalizeAttemptResponse(payload: unknown, fallbackId: string): AttemptMeta & { questions: AttemptQuestion[]; answers: Answers } {
   const source = payload as Record<string, unknown>;
-  const nested = (source?.data as Record<string, unknown> | undefined) ?? source;
+  const nested = ((source?.data as Record<string, unknown> | undefined) ?? source) as Record<string, any>;
   const questions = Array.isArray(nested?.questions) ? (nested.questions as AttemptQuestion[]) : [];
   const answers: Answers = {};
 

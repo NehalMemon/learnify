@@ -256,7 +256,7 @@ export default function LandingPage(): React.ReactElement {
               >
                 <div className="flex justify-center mb-4 group-hover:scale-110 transition-transform duration-200">
                   <div className="p-3 rounded-lg bg-white/20 group-hover:bg-white/30 transition-colors duration-200">
-                    {React.cloneElement(stat.icon as React.ReactElement, {
+                    {React.cloneElement(stat.icon as React.ReactElement<{ className?: string }>, {
                       className: 'w-6 h-6 text-white',
                     })}
                   </div>

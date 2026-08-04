@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  swcMinify: true,
   experimental: {
     reactCompiler: true,
     optimizePackageImports: [

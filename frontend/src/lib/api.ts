@@ -46,7 +46,7 @@ const LEGACY_TOKEN_COOKIE_NAMES = ['accessToken', 'refreshToken', 'token'] as co
  * Auth tokens are stored in HttpOnly cookies set by the API server.
  * Client-side JavaScript cannot read them by design.
  */
-export const getTokens = (): null => null;
+export const getTokens = (): { accessToken?: string; refreshToken?: string } | null => null;
 
 /**
  * Kept as a no-op for older imports; token writes must happen server-side.
@@ -310,8 +310,15 @@ export const authApi = {
    * Get current user profile.
    */
   getMe: async () => {
-    const response = await apiClient.get('/auth/me');
-    return response.data;
+    try {
+      const response = await apiClient.get('/auth/me');
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && (!error.response || error.code === 'ERR_NETWORK')) {
+        return { success: false, data: null, isNetworkError: true };
+      }
+      throw error;
+    }
   },
 
   updateQuizOnboarding: async (data: {

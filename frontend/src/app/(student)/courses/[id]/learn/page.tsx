@@ -347,7 +347,7 @@ function CourseContentViewer() {
             <div className="flex items-center space-x-4">
               {!currentMaterial.isCompleted && (
                 <Button
-                  variant="primary"
+                  variant="default"
                   onClick={handleCompleteMaterial}
                   isLoading={isCompleting}
                 >

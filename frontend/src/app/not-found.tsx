@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import {
@@ -8,55 +6,11 @@ import {
   BrainCircuit,
   GraduationCap,
   Sparkles,
-  Search,
 } from 'lucide-react';
 
 export default function NotFound() {
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-slate-50 via-purple-50/30 to-slate-50 px-4 py-12 text-center font-sans antialiased">
-      {/* CSS Keyframe Animations for Floating & Shadow Effects */}
-      <style jsx global>{`
-        @keyframes floatBook {
-          0%, 100% {
-            transform: translateY(0px) rotate(0deg);
-          }
-          50% {
-            transform: translateY(-16px) rotate(1.5deg);
-          }
-        }
-        @keyframes shadowPulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.25;
-          }
-          50% {
-            transform: scale(0.75);
-            opacity: 0.1;
-          }
-        }
-        @keyframes floatSparkle {
-          0%, 100% {
-            transform: translateY(0px) scale(1);
-            opacity: 0.7;
-          }
-          50% {
-            transform: translateY(-10px) scale(1.2);
-            opacity: 1;
-          }
-        }
-        .animate-float-book {
-          animation: floatBook 3.5s ease-in-out infinite;
-        }
-        .animate-shadow-pulse {
-          animation: shadowPulse 3.5s ease-in-out infinite;
-        }
-        .animate-sparkle-1 {
-          animation: floatSparkle 2.8s ease-in-out infinite 0.2s;
-        }
-        .animate-sparkle-2 {
-          animation: floatSparkle 3.2s ease-in-out infinite 0.8s;
-        }
-      `}</style>
 
       {/* Ambient background glow */}
       <div

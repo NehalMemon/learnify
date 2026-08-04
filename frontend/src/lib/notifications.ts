@@ -20,9 +20,9 @@ interface NotifyAllAdminsParams {
 // Why a dedicated admin client: RLS blocks cross-user inserts.
 // The service-role key bypasses RLS so server actions can write
 // notifications into any user's row without policy exceptions.
-let _adminClient: ReturnType<typeof createClient> | null = null;
+let _adminClient: any = null;
 
-function getAdminClient(): ReturnType<typeof createClient> {
+function getAdminClient(): any {
   if (_adminClient) return _adminClient;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -114,7 +114,7 @@ export async function notifyAllAdmins({
       return;
     }
 
-    const adminIds = (admins ?? []).map((a) => a.id as string);
+    const adminIds = (admins ?? []).map((a: any) => a.id as string);
 
     if (adminIds.length === 0) {
       console.error('[notifications] notifyAllAdmins: no admin users found');
@@ -122,7 +122,7 @@ export async function notifyAllAdmins({
     }
 
     // Batch insert one notification per admin
-    const rows = adminIds.map((adminId) => ({
+    const rows = adminIds.map((adminId: string) => ({
       user_id: adminId,
       title,
       message,
