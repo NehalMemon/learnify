@@ -6,8 +6,11 @@ import { toast } from 'react-hot-toast';
 import {
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Database,
   Filter,
+  Folder,
   Layers,
   Plus,
   RefreshCw,
@@ -145,6 +148,26 @@ export default function QuestionBankVaultPage() {
       return true;
     });
   }, [questions, selectedCategoryId, selectedSubjectId, selectedType, selectedDifficulty, submittedSearch, taxonomy, availableSubjects]);
+
+  // Data Transformation: Group by Category -> Subject
+  const groupedData = useMemo(() => {
+    const catMap: Record<string, Record<string, BankQuestion[]>> = {};
+
+    filteredQuestions.forEach((q) => {
+      const catName = getRelationName(q.category) || 'General Category';
+      const subjName = getRelationName(q.subject) || 'General / Unassigned';
+
+      if (!catMap[catName]) {
+        catMap[catName] = {};
+      }
+      if (!catMap[catName][subjName]) {
+        catMap[catName][subjName] = [];
+      }
+      catMap[catName][subjName].push(q);
+    });
+
+    return catMap;
+  }, [filteredQuestions]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -426,10 +449,11 @@ export default function QuestionBankVaultPage() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Filter Count & Clear */}
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-semibold text-[#696778]">
-                  Showing {filteredQuestions.length} question{filteredQuestions.length === 1 ? '' : 's'}
+                  Showing {filteredQuestions.length} question{filteredQuestions.length === 1 ? '' : 's'} across {Object.keys(groupedData).length} category group{Object.keys(groupedData).length === 1 ? '' : 's'}
                 </span>
                 {isFiltered ? (
                   <button
@@ -442,126 +466,185 @@ export default function QuestionBankVaultPage() {
                 ) : null}
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-[#e4e6ef] bg-white shadow-xs">
-                <div className="divide-y divide-[#eceef5]">
-                  {filteredQuestions.map((q) => {
-                    const catName = getRelationName(q.category);
-                    const subjName = getRelationName(q.subject);
+              {/* Nested Accordion: Category Level 1 -> Subject Level 2 -> Question Cards Level 3 */}
+              <div className="space-y-6">
+                {Object.entries(groupedData).map(([catName, subjectsMap]) => {
+                  const totalCatQuestions = Object.values(subjectsMap).reduce(
+                    (acc, list) => acc + list.length,
+                    0
+                  );
 
-                    const optionsList: { id: string; text: string }[] =
-                      Array.isArray(q.content?.options)
-                        ? q.content.options
-                        : q.option_a
-                        ? [
-                            { id: 'A', text: q.option_a },
-                            { id: 'B', text: q.option_b },
-                            { id: 'C', text: q.option_c },
-                            { id: 'D', text: q.option_d },
-                          ]
-                        : [];
-
-                    const correctVal = q.correct_answer?.value;
-                    const correctVals: string[] = Array.isArray(q.correct_answer?.values)
-                      ? q.correct_answer.values
-                      : correctVal
-                      ? [String(correctVal)]
-                      : q.correct_option
-                      ? [q.correct_option]
-                      : [];
-
-                    return (
-                      <div key={q.id} className="p-5 transition hover:bg-[#fbfbfd]">
-                        {/* Top row: Badges & Actions */}
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            {getTypeBadge(q.type)}
-                            {getDifficultyBadge(q.difficulty)}
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                              {q.points || 1} pt{q.points === 1 ? '' : 's'}
-                            </span>
-                            {catName ? (
-                              <span className="rounded-full bg-[#f1f0ff] px-2.5 py-0.5 text-xs font-semibold text-[#3525cd]">
-                                {catName}
+                  return (
+                    <details
+                      key={catName}
+                      open
+                      className="group/cat rounded-2xl border border-[#e4e6ef] bg-white shadow-xs overflow-hidden transition"
+                    >
+                      {/* Level 1 Header: Category Container */}
+                      <summary className="flex items-center justify-between p-4 cursor-pointer bg-[#f7f7fc] hover:bg-[#f0f1f8] border-b border-[#e4e6ef] transition select-none">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#3525cd]/10 text-[#3525cd]">
+                            <Layers className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h2 className="text-base font-bold text-[#191c1e] flex items-center gap-2">
+                              <span>{catName}</span>
+                              <span className="rounded-full bg-[#3525cd] px-2.5 py-0.5 text-xs font-bold text-white">
+                                {totalCatQuestions}
                               </span>
-                            ) : null}
-                            {subjName ? (
-                              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                                {subjName}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(q.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
-                            title="Delete question"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        {/* Question Text */}
-                        <h3 className="mt-3 text-sm font-bold leading-snug text-[#191c1e]">
-                          {q.question_text}
-                        </h3>
-
-                        {/* Choices / Answers Preview */}
-                        {q.type === 'SHORT_ANSWER' ? (
-                          <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3 text-xs text-emerald-900 font-medium">
-                            <span className="font-bold text-emerald-800">Accepted Answer: </span>
-                            "{correctVal || 'N/A'}"
-                          </div>
-                        ) : optionsList.length > 0 ? (
-                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
-                            {optionsList.map((opt) => {
-                              const isCorrect = correctVals.includes(opt.id) || (q.correct_option && q.correct_option === opt.id);
-                              return (
-                                <div
-                                  key={opt.id}
-                                  className={`rounded-xl border p-2.5 ${
-                                    isCorrect
-                                      ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900'
-                                      : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'
-                                  }`}
-                                >
-                                  <span className="font-bold text-[#3525cd]">{opt.id}: </span>
-                                  {opt.text}
-                                  {isCorrect ? (
-                                    <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" />
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        {/* Explanation & Tags Footer */}
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#eceef5] pt-3 text-xs text-[#777586]">
-                          {q.explanation ? (
-                            <p className="line-clamp-1 italic text-[#696778]">
-                              <span className="font-semibold not-italic text-[#191c1e]">Explanation:</span> {q.explanation}
+                            </h2>
+                            <p className="text-xs text-[#696778]">
+                              {Object.keys(subjectsMap).length} subject group{Object.keys(subjectsMap).length === 1 ? '' : 's'}
                             </p>
-                          ) : <div />}
-
-                          {q.tags && q.tags.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Tag className="h-3 w-3 text-[#3525cd]" />
-                              {q.tags.map((tag, idx) => (
-                                <span
-                                  key={idx}
-                                  className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60"
-                                >
-                                  #{tag}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
+                          </div>
                         </div>
+
+                        <div className="flex items-center gap-2 text-[#777586]">
+                          <ChevronDown className="h-5 w-5 transition-transform duration-200 group-open/cat:rotate-180" />
+                        </div>
+                      </summary>
+
+                      {/* Level 2: Subject Containers */}
+                      <div className="p-4 space-y-4 bg-[#fbfbfd]">
+                        {Object.entries(subjectsMap).map(([subjName, qList]) => (
+                          <details
+                            key={subjName}
+                            open
+                            className="group/subj rounded-xl border border-[#eceef5] bg-white overflow-hidden shadow-2xs"
+                          >
+                            {/* Level 2 Sub-Header: Subject Container */}
+                            <summary className="flex items-center justify-between px-4 py-3 cursor-pointer bg-[#f8f9fc] hover:bg-[#f2f3fa] border-b border-[#eceef5] transition select-none">
+                              <div className="flex items-center gap-2.5">
+                                <BookOpen className="h-4 w-4 text-[#4f46e5]" />
+                                <h3 className="text-sm font-bold text-[#191c1e]">
+                                  {subjName}
+                                </h3>
+                                <span className="rounded-full bg-[#f1f0ff] px-2 py-0.5 text-xs font-bold text-[#3525cd] border border-[#3525cd]/20">
+                                  {qList.length}
+                                </span>
+                              </div>
+
+                              <ChevronDown className="h-4 w-4 text-[#777586] transition-transform duration-200 group-open/subj:rotate-180" />
+                            </summary>
+
+                            {/* Level 3: Actual Question Cards */}
+                            <div className="divide-y divide-[#eceef5]">
+                              {qList.map((q) => {
+                                const optionsList: { id: string; text: string }[] =
+                                  Array.isArray(q.content?.options)
+                                    ? q.content.options
+                                    : q.option_a
+                                    ? [
+                                        { id: 'A', text: q.option_a },
+                                        { id: 'B', text: q.option_b },
+                                        { id: 'C', text: q.option_c },
+                                        { id: 'D', text: q.option_d },
+                                      ]
+                                    : [];
+
+                                const correctVal = q.correct_answer?.value;
+                                const correctVals: string[] = Array.isArray(q.correct_answer?.values)
+                                  ? q.correct_answer.values
+                                  : correctVal
+                                  ? [String(correctVal)]
+                                  : q.correct_option
+                                  ? [q.correct_option]
+                                  : [];
+
+                                return (
+                                  <div key={q.id} className="p-5 transition hover:bg-[#fbfbfd]">
+                                    {/* Top row: Badges & Actions */}
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {getTypeBadge(q.type)}
+                                        {getDifficultyBadge(q.difficulty)}
+                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                                          {q.points || 1} pt{q.points === 1 ? '' : 's'}
+                                        </span>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDelete(q.id)}
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
+                                        title="Delete question"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
+
+                                    {/* Question Text */}
+                                    <h4 className="mt-3 text-sm font-bold leading-snug text-[#191c1e]">
+                                      {q.question_text}
+                                    </h4>
+
+                                    {/* Choices / Answers Preview */}
+                                    {q.type === 'SHORT_ANSWER' ? (
+                                      <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3 text-xs text-emerald-900 font-medium">
+                                        <span className="font-bold text-emerald-800">Accepted Answer: </span>
+                                        "{correctVal || 'N/A'}"
+                                      </div>
+                                    ) : optionsList.length > 0 ? (
+                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
+                                        {optionsList.map((opt) => {
+                                          const isCorrect =
+                                            correctVals.includes(opt.id) ||
+                                            (q.correct_option && q.correct_option === opt.id);
+                                          return (
+                                            <div
+                                              key={opt.id}
+                                              className={`rounded-xl border p-2.5 ${
+                                                isCorrect
+                                                  ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900'
+                                                  : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'
+                                              }`}
+                                            >
+                                              <span className="font-bold text-[#3525cd]">{opt.id}: </span>
+                                              {opt.text}
+                                              {isCorrect ? (
+                                                <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" />
+                                              ) : null}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+
+                                    {/* Explanation & Tags Footer */}
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#eceef5] pt-3 text-xs text-[#777586]">
+                                      {q.explanation ? (
+                                        <p className="line-clamp-1 italic text-[#696778]">
+                                          <span className="font-semibold not-italic text-[#191c1e]">Explanation:</span>{' '}
+                                          {q.explanation}
+                                        </p>
+                                      ) : (
+                                        <div />
+                                      )}
+
+                                      {q.tags && q.tags.length > 0 ? (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <Tag className="h-3 w-3 text-[#3525cd]" />
+                                          {q.tags.map((tag, idx) => (
+                                            <span
+                                              key={idx}
+                                              className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60"
+                                            >
+                                              #{tag}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </details>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
+                    </details>
+                  );
+                })}
               </div>
             </div>
           )}
