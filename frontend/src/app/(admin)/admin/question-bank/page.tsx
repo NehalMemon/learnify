@@ -6,12 +6,12 @@ import {
   CheckCircle2,
   Database,
   Filter,
-  HelpCircle,
   Plus,
   RefreshCw,
   Search,
   Tag,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
   deleteBankQuestion,
@@ -31,21 +31,6 @@ function getRelationName(relation?: { name?: string | null } | { name?: string |
   if (!relation) return '';
   if (Array.isArray(relation)) return relation[0]?.name || '';
   return relation.name || '';
-}
-
-function getTypeLabel(type: BankQuestionType): string {
-  switch (type) {
-    case 'SINGLE_CHOICE':
-      return 'Single Choice';
-    case 'MULTIPLE_CHOICE':
-      return 'Multiple Choice';
-    case 'TRUE_FALSE':
-      return 'True / False';
-    case 'SHORT_ANSWER':
-      return 'Short Answer';
-    default:
-      return type || 'Question';
-  }
 }
 
 export default function QuestionBankVaultPage() {
@@ -153,6 +138,15 @@ export default function QuestionBankVaultPage() {
     setSubmittedSearch(searchQuery);
   };
 
+  const handleResetFilters = () => {
+    setSelectedCategoryId('');
+    setSelectedSubjectId('');
+    setSelectedType('');
+    setSelectedDifficulty('');
+    setSearchQuery('');
+    setSubmittedSearch('');
+  };
+
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this question from the bank? This action cannot be undone.')) return;
 
@@ -224,6 +218,8 @@ export default function QuestionBankVaultPage() {
     }
   };
 
+  const isFiltered = Boolean(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch);
+
   return (
     <div className="mx-auto w-full max-w-7xl pb-10 font-sans text-[#191c1e] antialiased">
       {/* Page Header */}
@@ -262,137 +258,111 @@ export default function QuestionBankVaultPage() {
         </div>
       </div>
 
-      {/* Sidebar Filters & Content Layout */}
-      <div className="flex flex-col md:flex-row items-start gap-6">
-        {/* Left Sidebar Filter Panel */}
-        <div className="w-full md:w-72 lg:w-80 shrink-0">
-          <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs">
-            <div className="flex items-center justify-between border-b border-[#eceef5] pb-3">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
-                <Filter className="h-4 w-4 text-[#3525cd]" />
-                <span>Vault Filters</span>
-              </div>
-              {(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch) ? (
+      {/* Main Vertical Stack Container */}
+      <div className="flex flex-col gap-6 w-full">
+        {/* Horizontal Top-Bar Filter Card */}
+        <div className="w-full rounded-2xl border border-[#e4e6ef] bg-white p-4 shadow-xs">
+          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-center w-full">
+            {/* 1. Search Query Input (Spans 2 cols on lg) */}
+            <div className="relative col-span-1 lg:col-span-2">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search prompt, choices, tags..."
+                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-10 pr-4 text-xs font-medium text-[#191c1e] outline-none transition placeholder:text-[#8d8b99] focus:border-[#3525cd] focus:bg-white"
+              />
+            </div>
+
+            {/* 2. Category Filter */}
+            <div className="w-full">
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => {
+                  setSelectedCategoryId(e.target.value);
+                  setSelectedSubjectId('');
+                }}
+                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+              >
+                <option value="">All Categories</option>
+                {taxonomy.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Subject Filter */}
+            <div className="w-full">
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                disabled={!selectedCategoryId || availableSubjects.length === 0}
+                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white disabled:opacity-50"
+              >
+                <option value="">All Subjects</option>
+                {availableSubjects.map((subj) => (
+                  <option key={subj.id} value={subj.id}>
+                    {subj.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 4. Question Type Filter */}
+            <div className="w-full">
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+              >
+                <option value="">All Types</option>
+                <option value="SINGLE_CHOICE">Single Choice</option>
+                <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                <option value="TRUE_FALSE">True / False</option>
+                <option value="SHORT_ANSWER">Short Answer</option>
+              </select>
+            </div>
+
+            {/* 5. Difficulty Filter & Search Action Button (Grid item 6) */}
+            <div className="flex items-center gap-2 w-full">
+              <select
+                value={selectedDifficulty}
+                onChange={(e) => setSelectedDifficulty(e.target.value)}
+                className="min-h-11 flex-1 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+              >
+                <option value="">Difficulty</option>
+                <option value="EASY">EASY</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="HARD">HARD</option>
+              </select>
+
+              <button
+                type="submit"
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-[#2f20b8] shrink-0"
+              >
+                <Search className="h-3.5 w-3.5" />
+                Search
+              </button>
+
+              {isFiltered ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedCategoryId('');
-                    setSelectedSubjectId('');
-                    setSelectedType('');
-                    setSelectedDifficulty('');
-                    setSearchQuery('');
-                    setSubmittedSearch('');
-                  }}
-                  className="text-xs font-semibold text-[#3525cd] hover:underline"
+                  onClick={handleResetFilters}
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#dadce5] bg-white text-[#4b4a58] transition hover:bg-[#f7f7fb] shrink-0"
+                  title="Reset filters"
                 >
-                  Reset
+                  <X className="h-4 w-4" />
                 </button>
               ) : null}
             </div>
-
-            <form onSubmit={handleSearch} className="mt-4 space-y-4">
-              {/* Search Query Input */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
-                  Search Text
-                </label>
-                <div className="relative mt-1.5">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setSubmittedSearch(e.target.value);
-                    }}
-                    placeholder="Search prompt, choices, tags..."
-                    className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-9 pr-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              {/* Category Filter */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
-                  Category
-                </label>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => {
-                    setSelectedCategoryId(e.target.value);
-                    setSelectedSubjectId('');
-                  }}
-                  className="mt-1.5 min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                >
-                  <option value="">All Categories</option>
-                  {taxonomy.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Subject Filter */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
-                  Subject
-                </label>
-                <select
-                  value={selectedSubjectId}
-                  onChange={(e) => setSelectedSubjectId(e.target.value)}
-                  disabled={!selectedCategoryId || availableSubjects.length === 0}
-                  className="mt-1.5 min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white disabled:opacity-50"
-                >
-                  <option value="">All Subjects</option>
-                  {availableSubjects.map((subj) => (
-                    <option key={subj.id} value={subj.id}>
-                      {subj.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Question Type Filter */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
-                  Question Type
-                </label>
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value)}
-                  className="mt-1.5 min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                >
-                  <option value="">All Question Types</option>
-                  <option value="SINGLE_CHOICE">Single Choice</option>
-                  <option value="MULTIPLE_CHOICE">Multiple Choice</option>
-                  <option value="TRUE_FALSE">True / False</option>
-                  <option value="SHORT_ANSWER">Short Answer</option>
-                </select>
-              </div>
-
-              {/* Difficulty Filter */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
-                  Difficulty
-                </label>
-                <select
-                  value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value)}
-                  className="mt-1.5 min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                >
-                  <option value="">All Difficulties</option>
-                  <option value="EASY">EASY</option>
-                  <option value="MEDIUM">MEDIUM</option>
-                  <option value="HARD">HARD</option>
-                </select>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 w-full min-w-0">
+        {/* Main Content Area (Stretches Full Width Directly Below Filter Bar) */}
+        <div className="w-full min-w-0">
           {isLoading ? (
             <div className="flex min-h-72 items-center justify-center rounded-2xl border border-[#e4e6ef] bg-white">
               <Spinner size="lg" />
@@ -425,6 +395,15 @@ export default function QuestionBankVaultPage() {
                 <span className="text-xs font-semibold text-[#696778]">
                   Showing {filteredQuestions.length} question{filteredQuestions.length === 1 ? '' : 's'}
                 </span>
+                {isFiltered ? (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="text-xs font-semibold text-[#3525cd] hover:underline"
+                  >
+                    Clear all filters
+                  </button>
+                ) : null}
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-[#e4e6ef] bg-white shadow-xs">
