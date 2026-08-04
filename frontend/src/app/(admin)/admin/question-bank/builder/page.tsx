@@ -136,20 +136,34 @@ function MassEntryBuilderContent() {
   };
 
   const toggleMultiCorrect = (index: number, optionId: string) => {
-    setQuestions((prev) => {
-      const updated = [...prev];
-      const current = updated[index].multiCorrectOptions || [];
-      if (current.includes(optionId)) {
-        if (current.length <= 1) {
-          toast.error('Multiple Choice requires at least 1 correct answer.');
-          return prev;
-        }
-        updated[index].multiCorrectOptions = current.filter((id) => id !== optionId);
-      } else {
-        updated[index].multiCorrectOptions = [...current, optionId];
+    const question = questions[index];
+    if (!question) return;
+
+    const current = question.multiCorrectOptions || [];
+
+    if (current.includes(optionId)) {
+      if (current.length <= 1) {
+        toast.error('Multiple Choice requires at least 1 correct answer.');
+        return;
       }
-      return updated;
-    });
+      const nextOptions = current.filter((id) => id !== optionId);
+      setQuestions((prev) => {
+        const updated = [...prev];
+        if (updated[index]) {
+          updated[index] = { ...updated[index], multiCorrectOptions: nextOptions };
+        }
+        return updated;
+      });
+    } else {
+      const nextOptions = [...current, optionId];
+      setQuestions((prev) => {
+        const updated = [...prev];
+        if (updated[index]) {
+          updated[index] = { ...updated[index], multiCorrectOptions: nextOptions };
+        }
+        return updated;
+      });
+    }
   };
 
   const handleSaveToVault = async () => {
