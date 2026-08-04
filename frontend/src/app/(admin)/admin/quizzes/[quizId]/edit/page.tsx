@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api";
 import { toast } from "react-hot-toast";
+import { getCategoriesWithSubjects } from "@/app/actions/taxonomyActions";
+import { getQuizById, saveFullQuiz } from "@/app/actions/quizAdminActions";
 import {
   Dialog,
   DialogContent,
@@ -371,35 +373,64 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      setError(null);
       try {
-        // Fetch categories and specific quiz details in parallel
-        const [catRes, quizRes] = await Promise.all([
-          apiClient.get<{ success: boolean; data: Category[] }>("/quiz/categories"),
-          apiClient.get<{ success: boolean; data: any }>(`/admin/quizzes/${quizId}`),
+        // Fetch taxonomy categories & target quiz safely using Server Actions with API client fallbacks
+        const [catsData, targetQuiz] = await Promise.all([
+          getCategoriesWithSubjects().catch(() => []),
+          getQuizById(quizId).catch(() => null),
         ]);
-        
-        setCategories(catRes.data.data);
-        const target = quizRes.data.data;
 
-        setTitle(target.title || "");
-        setCategoryId(target.categoryId || target.category?.id || "");
-        setSubject(target.subject || "");
-        setTimeLimitMinutes(target.durationSec ? Math.floor(target.durationSec / 60).toString() : "60");
-        setIsPublished(target.isPublished ?? true);
+        if (catsData && catsData.length > 0) {
+          setCategories(catsData.map((c) => ({ id: c.id, name: c.name })));
+        } else {
+          try {
+            const catRes = await apiClient.get<{ success: boolean; data: Category[] }>("/quiz/categories");
+            setCategories(catRes.data.data || []);
+          } catch {
+            // non-fatal fallback
+          }
+        }
 
-        // Map nested questions directly into state
-        const rawQuestions = target.questions || [];
-        setQuestions(rawQuestions.map((q: any) => ({
-          id: q.id,
-          questionText: q.questionText || "",
-          optionA: q.optionA || "",
-          optionB: q.optionB || "",
-          optionC: q.optionC || "",
-          optionD: q.optionD || "",
-          correctOption: q.correctOption || "A",
-          explanation: q.explanation || "",
-        })));
+        let target = targetQuiz;
+        if (!target) {
+          try {
+            const quizRes = await apiClient.get<{ success: boolean; data: any }>(`/admin/quizzes/${quizId}`);
+            target = quizRes.data.data;
+          } catch {
+            // non-fatal fallback
+          }
+        }
 
+        if (target) {
+          setTitle(target.title || "");
+          setCategoryId(target.category_id || target.categoryId || target.category?.id || "");
+          setSubject(target.subject_id || target.subject || "");
+          setTimeLimitMinutes(
+            target.duration_sec
+              ? Math.floor(target.duration_sec / 60).toString()
+              : target.durationSec
+              ? Math.floor(target.durationSec / 60).toString()
+              : "60"
+          );
+          setIsPublished(target.is_published ?? target.isPublished ?? true);
+
+          const rawQuestions = target.questions || [];
+          setQuestions(
+            rawQuestions.map((q: any) => ({
+              id: q.id,
+              questionText: q.question_text || q.questionText || "",
+              optionA: q.option_a || q.optionA || "",
+              optionB: q.option_b || q.optionB || "",
+              optionC: q.option_c || q.optionC || "",
+              optionD: q.option_d || q.optionD || "",
+              correctOption: q.correct_option || q.correctOption || "A",
+              explanation: q.explanation || "",
+            }))
+          );
+        } else {
+          setError("Failed to load quiz data. Please refresh or check connection.");
+        }
       } catch (err: unknown) {
         setError("Failed to load quiz data. Please refresh the page.");
         console.error("[EditQuiz] Load error:", err);
@@ -453,28 +484,59 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
     }
 
     setIsSubmitting(true);
+
+    const formattedQuestions = questions.map((q) => ({
+      id: q.id,
+      type: 'SINGLE_CHOICE' as const,
+      question_text: q.questionText || '',
+      option_a: q.optionA || null,
+      option_b: q.optionB || null,
+      option_c: q.optionC || null,
+      option_d: q.optionD || null,
+      correct_option: q.correctOption || 'A',
+      explanation: q.explanation || null,
+      content: {
+        optionA: q.optionA,
+        optionB: q.optionB,
+        optionC: q.optionC,
+        optionD: q.optionD,
+      },
+      correct_answer: { value: q.correctOption },
+    }));
+
     try {
-      const payload = {
-        title,
+      const res = await saveFullQuiz({
+        id: quizId,
+        title: title.trim(),
         categoryId,
-        subject,
+        subjectId: subject && subject.trim().length > 0 ? subject.trim() : null,
         durationSec: parsedTimeLimitMinutes * 60,
         isPublished,
-        questions, // Backend updateFullQuiz handles the sync via IDs
-      };
-      
-      const res = await apiClient.put<{ success: boolean; message: string }>(
-        `/admin/quizzes/${quizId}`,
-        payload
-      );
-      
+        questions: formattedQuestions,
+      });
+
+      if (!res.success) {
+        // Fallback to Express API endpoint if Server Action fails
+        const payload = {
+          title,
+          categoryId,
+          subject,
+          durationSec: parsedTimeLimitMinutes * 60,
+          isPublished,
+          questions,
+        };
+        await apiClient.put(`/admin/quizzes/${quizId}`, payload);
+      }
+
       setSuccess("Quiz updated successfully!");
       toast.success("Quiz updated!");
-      setTimeout(() => router.push("/admin/quizzes"), 1600);
+      setTimeout(() => router.push("/admin/quizzes/library"), 800);
     } catch (err: unknown) {
       const msg =
-        (err as any)?.response?.data?.message ?? "Failed to update quiz. Please try again.";
+        (err as any)?.response?.data?.message ??
+        (err instanceof Error ? err.message : "Failed to update quiz. Please try again.");
       setError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

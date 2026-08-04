@@ -313,4 +313,25 @@ export async function getAdminQuizzes() {
   }
 }
 
+export async function getQuizById(quizId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .select('*, category:quiz_categories(id, name), subject:quiz_subjects(id, name), questions:quiz_questions(*)')
+      .eq('id', quizId)
+      .single();
+
+    if (quizError) {
+      console.error('DB Error (getQuizById):', quizError);
+      return null;
+    }
+
+    return quiz;
+  } catch (error) {
+    console.error('getQuizById unexpected error:', error);
+    return null;
+  }
+}
+
 export const saveQuiz = saveFullQuiz;
