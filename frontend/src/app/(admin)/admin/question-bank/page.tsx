@@ -6,13 +6,10 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import {
   ArrowRight,
-  BookOpen,
   Database,
-  Folder,
   Layers,
   Plus,
   RefreshCw,
-  Search,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -179,7 +176,7 @@ export default function QuestionBankLibraryPage() {
             type="button"
             onClick={() => fetchQuestions({ silent: true })}
             disabled={isRefreshing}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 py-2 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Library
@@ -192,7 +189,7 @@ export default function QuestionBankLibraryPage() {
               setGatewaySubjId('');
               setIsGatewayModalOpen(true);
             }}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8] whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
             + Add to Bank
@@ -203,7 +200,7 @@ export default function QuestionBankLibraryPage() {
       {/* Main Vault Grid Container */}
       <div className="w-full">
         {isLoading ? (
-          <div className="flex min-h-72 items-center justify-center rounded-2xl border border-[#e4e6ef] bg-white">
+          <div className="flex min-h-72 items-center justify-center rounded-2xl border border-gray-200 bg-white">
             <Spinner size="lg" />
           </div>
         ) : error ? (
@@ -224,7 +221,7 @@ export default function QuestionBankLibraryPage() {
                 setGatewaySubjId('');
                 setIsGatewayModalOpen(true);
               }}
-              className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white transition hover:bg-[#2f20b8]"
+              className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2f20b8] whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
               + Add to Bank
@@ -246,11 +243,11 @@ export default function QuestionBankLibraryPage() {
                 return (
                   <div
                     key={vault.categoryId}
-                    className="flex flex-col justify-between rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-sm transition hover:border-[#3525cd]/40 hover:shadow-md"
+                    className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-xs hover:shadow-md transition-all duration-200"
                   >
                     <div>
                       {/* Top Row: Icon & Category Name */}
-                      <div className="flex items-start justify-between border-b border-[#eceef5] pb-4">
+                      <div className="flex items-start justify-between border-b border-gray-100 pb-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#3525cd]/10 text-[#3525cd]">
                             <Layers className="h-6 w-6" />
@@ -266,37 +263,33 @@ export default function QuestionBankLibraryPage() {
                         </div>
                       </div>
 
-                      {/* Minimal Stats */}
-                      <div className="mt-5 grid grid-cols-2 gap-3 text-center">
-                        <div className="rounded-xl border border-[#eceef5] bg-[#f8f9fc] p-3">
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-[#696778]">
+                      {/* Clean Minimal Stats Grid */}
+                      <div className="grid grid-cols-2 gap-4 py-4 border-y border-gray-100 my-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             Total Questions
                           </p>
-                          <p className="mt-1 text-xl font-extrabold text-[#3525cd]">
+                          <p className="text-2xl font-bold text-gray-900 mt-1">
                             {vault.totalQuestions}
                           </p>
                         </div>
 
-                        <div className="rounded-xl border border-[#eceef5] bg-[#f8f9fc] p-3">
-                          <p className="text-[11px] font-bold uppercase tracking-wider text-[#696778]">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             Subjects
                           </p>
-                          <p className="mt-1 text-xl font-extrabold text-[#191c1e]">
+                          <p className="text-2xl font-bold text-gray-900 mt-1">
                             {vault.uniqueSubjectsCount}
                           </p>
                         </div>
                       </div>
                     </div>
 
-                    {/* Bottom Action: Open Vault → Button */}
-                    <div className="mt-6 pt-4 border-t border-[#eceef5] flex items-center justify-between">
-                      <span className="text-xs font-semibold text-[#777586]">
-                        Category Repository
-                      </span>
-
+                    {/* Card Footer */}
+                    <div className="flex justify-end pt-2">
                       <Link
                         href={openUrl}
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-[#2f20b8]"
+                        className="inline-flex items-center gap-2 rounded-xl bg-[#3525cd] px-4 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#2f20b8]"
                       >
                         <span>Open Vault</span>
                         <ArrowRight className="h-4 w-4" />
