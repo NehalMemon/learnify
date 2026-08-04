@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/utils/supabase/server';
 
 export type QuestionDifficulty = 'EASY' | 'MEDIUM' | 'HARD';
-export type CorrectOption = 'A' | 'B' | 'C' | 'D';
+export type BankQuestionType = 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
 
 export interface BankQuestionRelation {
   id?: string;
@@ -15,15 +15,19 @@ export interface BankQuestion {
   id: string;
   category_id?: string | null;
   subject_id?: string | null;
+  type: BankQuestionType;
   question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_option: CorrectOption;
+  points?: number;
   explanation?: string | null;
   difficulty: QuestionDifficulty;
   tags?: string[] | null;
+  content: Record<string, any>;
+  correct_answer: Record<string, any>;
+  option_a?: string | null;
+  option_b?: string | null;
+  option_c?: string | null;
+  option_d?: string | null;
+  correct_option?: string | null;
   created_at?: string;
   updated_at?: string;
   category?: BankQuestionRelation | BankQuestionRelation[] | null;
@@ -33,15 +37,14 @@ export interface BankQuestion {
 export interface CreateBankQuestionInput {
   category_id?: string | null;
   subject_id?: string | null;
+  type: BankQuestionType;
   question_text: string;
-  option_a: string;
-  option_b: string;
-  option_c: string;
-  option_d: string;
-  correct_option: CorrectOption;
+  points?: number;
   explanation?: string | null;
   difficulty?: QuestionDifficulty;
   tags?: string[];
+  content: Record<string, any>;
+  correct_answer: Record<string, any>;
 }
 
 export async function createBankQuestion(input: CreateBankQuestionInput) {
@@ -51,15 +54,14 @@ export async function createBankQuestion(input: CreateBankQuestionInput) {
     const payload = {
       category_id: input.category_id || null,
       subject_id: input.subject_id || null,
+      type: input.type || 'SINGLE_CHOICE',
       question_text: input.question_text.trim(),
-      option_a: input.option_a.trim(),
-      option_b: input.option_b.trim(),
-      option_c: input.option_c.trim(),
-      option_d: input.option_d.trim(),
-      correct_option: input.correct_option,
+      points: Number(input.points) || 1,
       explanation: input.explanation ? input.explanation.trim() : null,
       difficulty: input.difficulty || 'MEDIUM',
       tags: Array.isArray(input.tags) ? input.tags : [],
+      content: input.content ?? {},
+      correct_answer: input.correct_answer ?? {},
     };
 
     const { data, error } = await supabase
@@ -84,6 +86,7 @@ export async function createBankQuestion(input: CreateBankQuestionInput) {
 export async function getBankQuestions(filters?: {
   category_id?: string;
   subject_id?: string;
+  type?: string;
   difficulty?: string;
   searchQuery?: string;
 }) {
@@ -100,6 +103,10 @@ export async function getBankQuestions(filters?: {
 
     if (filters?.subject_id) {
       query = query.eq('subject_id', filters.subject_id);
+    }
+
+    if (filters?.type) {
+      query = query.eq('type', filters.type);
     }
 
     if (filters?.difficulty) {

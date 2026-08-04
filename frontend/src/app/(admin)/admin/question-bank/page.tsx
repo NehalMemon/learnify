@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Database,
   Filter,
+  HelpCircle,
   Plus,
   RefreshCw,
   Search,
@@ -16,6 +17,7 @@ import {
   deleteBankQuestion,
   getBankQuestions,
   type BankQuestion,
+  type BankQuestionType,
   type QuestionDifficulty,
 } from '@/app/actions/questionBankActions';
 import {
@@ -31,6 +33,21 @@ function getRelationName(relation?: { name?: string | null } | { name?: string |
   return relation.name || '';
 }
 
+function getTypeLabel(type: BankQuestionType): string {
+  switch (type) {
+    case 'SINGLE_CHOICE':
+      return 'Single Choice';
+    case 'MULTIPLE_CHOICE':
+      return 'Multiple Choice';
+    case 'TRUE_FALSE':
+      return 'True / False';
+    case 'SHORT_ANSWER':
+      return 'Short Answer';
+    default:
+      return type || 'Question';
+  }
+}
+
 export default function QuestionBankVaultPage() {
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
@@ -41,6 +58,7 @@ export default function QuestionBankVaultPage() {
   // Filters State
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedType, setSelectedType] = useState<string>('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [submittedSearch, setSubmittedSearch] = useState<string>('');
@@ -79,14 +97,12 @@ export default function QuestionBankVaultPage() {
     fetchQuestions();
   }, []);
 
-  // Filter available subjects based on selected category
   const availableSubjects = useMemo(() => {
     if (!selectedCategoryId) return [];
     const cat = taxonomy.find((c) => c.id === selectedCategoryId);
     return cat ? cat.subjects : [];
   }, [taxonomy, selectedCategoryId]);
 
-  // Client-side filtering for fast interactive feedback
   const filteredQuestions = useMemo(() => {
     const query = submittedSearch.trim().toLowerCase();
 
@@ -105,6 +121,11 @@ export default function QuestionBankVaultPage() {
         if (quizSubjName !== subjName) return false;
       }
 
+      // Type filter
+      if (selectedType && item.type !== selectedType) {
+        return false;
+      }
+
       // Difficulty filter
       if (selectedDifficulty && item.difficulty !== selectedDifficulty) {
         return false;
@@ -115,7 +136,8 @@ export default function QuestionBankVaultPage() {
         const catName = getRelationName(item.category);
         const subjName = getRelationName(item.subject);
         const tagsStr = (item.tags || []).join(' ');
-        const haystack = [item.question_text, item.option_a, item.option_b, item.option_c, item.option_d, catName, subjName, tagsStr]
+        const optionsStr = JSON.stringify(item.content || {});
+        const haystack = [item.question_text, catName, subjName, tagsStr, optionsStr]
           .join(' ')
           .toLowerCase();
 
@@ -124,7 +146,7 @@ export default function QuestionBankVaultPage() {
 
       return true;
     });
-  }, [questions, selectedCategoryId, selectedSubjectId, selectedDifficulty, submittedSearch, taxonomy, availableSubjects]);
+  }, [questions, selectedCategoryId, selectedSubjectId, selectedType, selectedDifficulty, submittedSearch, taxonomy, availableSubjects]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,9 +189,44 @@ export default function QuestionBankVaultPage() {
     }
   };
 
+  const getTypeBadge = (type: BankQuestionType) => {
+    switch (type) {
+      case 'SINGLE_CHOICE':
+        return (
+          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 border border-indigo-200/60">
+            Single Choice
+          </span>
+        );
+      case 'MULTIPLE_CHOICE':
+        return (
+          <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 border border-purple-200/60">
+            Multiple Choice
+          </span>
+        );
+      case 'TRUE_FALSE':
+        return (
+          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/60">
+            True / False
+          </span>
+        );
+      case 'SHORT_ANSWER':
+        return (
+          <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-bold text-teal-700 border border-teal-200/60">
+            Short Answer
+          </span>
+        );
+      default:
+        return (
+          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-700">
+            {type}
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl pb-10 font-sans text-[#191c1e] antialiased">
-      {/* ── Page Header ────────────────────────────────────────────── */}
+      {/* Page Header */}
       <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4f46e5]">
@@ -179,7 +236,7 @@ export default function QuestionBankVaultPage() {
             Question Bank Vault
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b5a68]">
-            Master Repository — Store, filter, tag, and reuse standardized assessment questions.
+            Master Repository — Store, filter, tag, and reuse multi-type assessment questions.
           </p>
         </div>
 
@@ -205,7 +262,7 @@ export default function QuestionBankVaultPage() {
         </div>
       </div>
 
-      {/* ── Sidebar Filters & Main Content Layout ─────────────────── */}
+      {/* Sidebar Filters & Content Layout */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         {/* Left Sidebar Filter Panel */}
         <div className="lg:col-span-1">
@@ -227,7 +284,7 @@ export default function QuestionBankVaultPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search prompt, options, tags..."
+                    placeholder="Search prompt, choices, tags..."
                     className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-9 pr-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
                   />
                 </div>
@@ -275,6 +332,24 @@ export default function QuestionBankVaultPage() {
                 </select>
               </div>
 
+              {/* Question Type Filter */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
+                  Question Type
+                </label>
+                <select
+                  value={selectedType}
+                  onChange={(e) => setSelectedType(e.target.value)}
+                  className="mt-1.5 min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                >
+                  <option value="">All Question Types</option>
+                  <option value="SINGLE_CHOICE">Single Choice</option>
+                  <option value="MULTIPLE_CHOICE">Multiple Choice</option>
+                  <option value="TRUE_FALSE">True / False</option>
+                  <option value="SHORT_ANSWER">Short Answer</option>
+                </select>
+              </div>
+
               {/* Difficulty Filter */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#696778]">
@@ -299,12 +374,13 @@ export default function QuestionBankVaultPage() {
                 >
                   Apply Filters
                 </button>
-                {(selectedCategoryId || selectedSubjectId || selectedDifficulty || searchQuery || submittedSearch) ? (
+                {(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch) ? (
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedCategoryId('');
                       setSelectedSubjectId('');
+                      setSelectedType('');
                       setSelectedDifficulty('');
                       setSearchQuery('');
                       setSubmittedSearch('');
@@ -334,7 +410,7 @@ export default function QuestionBankVaultPage() {
               <Database className="mx-auto h-10 w-10 text-[#8d8b99]" />
               <h3 className="mt-4 text-base font-bold text-[#191c1e]">No vault questions found</h3>
               <p className="mt-1 text-xs leading-5 text-[#696778]">
-                {submittedSearch || selectedCategoryId || selectedSubjectId || selectedDifficulty
+                {submittedSearch || selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty
                   ? 'No questions match your current filter settings. Try resetting filters.'
                   : 'Start populating the master question bank by adding your first entry.'}
               </p>
@@ -361,12 +437,38 @@ export default function QuestionBankVaultPage() {
                     const catName = getRelationName(q.category);
                     const subjName = getRelationName(q.subject);
 
+                    // Parse JSONB content & correct answer
+                    const optionsList: { id: string; text: string }[] =
+                      Array.isArray(q.content?.options)
+                        ? q.content.options
+                        : q.option_a
+                        ? [
+                            { id: 'A', text: q.option_a },
+                            { id: 'B', text: q.option_b },
+                            { id: 'C', text: q.option_c },
+                            { id: 'D', text: q.option_d },
+                          ]
+                        : [];
+
+                    const correctVal = q.correct_answer?.value;
+                    const correctVals: string[] = Array.isArray(q.correct_answer?.values)
+                      ? q.correct_answer.values
+                      : correctVal
+                      ? [String(correctVal)]
+                      : q.correct_option
+                      ? [q.correct_option]
+                      : [];
+
                     return (
                       <div key={q.id} className="p-5 transition hover:bg-[#fbfbfd]">
                         {/* Top row: Badges & Actions */}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
+                            {getTypeBadge(q.type)}
                             {getDifficultyBadge(q.difficulty)}
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                              {q.points || 1} pt{q.points === 1 ? '' : 's'}
+                            </span>
                             {catName ? (
                               <span className="rounded-full bg-[#f1f0ff] px-2.5 py-0.5 text-xs font-semibold text-[#3525cd]">
                                 {catName}
@@ -394,28 +496,35 @@ export default function QuestionBankVaultPage() {
                           {q.question_text}
                         </h3>
 
-                        {/* Choices Grid */}
-                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
-                          <div className={`rounded-xl border p-2.5 ${q.correct_option === 'A' ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900' : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'}`}>
-                            <span className="font-bold text-[#3525cd]">A:</span> {q.option_a}
-                            {q.correct_option === 'A' ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" /> : null}
+                        {/* Choices / Answers Preview */}
+                        {q.type === 'SHORT_ANSWER' ? (
+                          <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3 text-xs text-emerald-900 font-medium">
+                            <span className="font-bold text-emerald-800">Accepted Answer: </span>
+                            "{correctVal || 'N/A'}"
                           </div>
-
-                          <div className={`rounded-xl border p-2.5 ${q.correct_option === 'B' ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900' : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'}`}>
-                            <span className="font-bold text-[#3525cd]">B:</span> {q.option_b}
-                            {q.correct_option === 'B' ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" /> : null}
+                        ) : optionsList.length > 0 ? (
+                          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
+                            {optionsList.map((opt) => {
+                              const isCorrect = correctVals.includes(opt.id) || (q.correct_option && q.correct_option === opt.id);
+                              return (
+                                <div
+                                  key={opt.id}
+                                  className={`rounded-xl border p-2.5 ${
+                                    isCorrect
+                                      ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900'
+                                      : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'
+                                  }`}
+                                >
+                                  <span className="font-bold text-[#3525cd]">{opt.id}: </span>
+                                  {opt.text}
+                                  {isCorrect ? (
+                                    <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" />
+                                  ) : null}
+                                </div>
+                              );
+                            })}
                           </div>
-
-                          <div className={`rounded-xl border p-2.5 ${q.correct_option === 'C' ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900' : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'}`}>
-                            <span className="font-bold text-[#3525cd]">C:</span> {q.option_c}
-                            {q.correct_option === 'C' ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" /> : null}
-                          </div>
-
-                          <div className={`rounded-xl border p-2.5 ${q.correct_option === 'D' ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900' : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'}`}>
-                            <span className="font-bold text-[#3525cd]">D:</span> {q.option_d}
-                            {q.correct_option === 'D' ? <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" /> : null}
-                          </div>
-                        </div>
+                        ) : null}
 
                         {/* Explanation & Tags Footer */}
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#eceef5] pt-3 text-xs text-[#777586]">
@@ -429,7 +538,10 @@ export default function QuestionBankVaultPage() {
                             <div className="flex flex-wrap items-center gap-1.5">
                               <Tag className="h-3 w-3 text-[#3525cd]" />
                               {q.tags.map((tag, idx) => (
-                                <span key={idx} className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60">
+                                <span
+                                  key={idx}
+                                  className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60"
+                                >
                                   #{tag}
                                 </span>
                               ))}
