@@ -8,7 +8,6 @@ export interface QuizCreateInput {
   categoryId: string;
   subjectId?: string | null;
   title: string;
-  subject?: string | null;
   year?: number;
   duration_sec?: number;
   is_published?: boolean;
@@ -41,7 +40,6 @@ export interface SaveFullQuizInput {
   title: string;
   categoryId: string;
   subjectId?: string | null;
-  subject?: string | null;
   durationSec?: number;
   creditCost?: number;
   isPublished?: boolean;
@@ -59,8 +57,6 @@ export async function createQuiz(quizData: QuizCreateInput) {
       categoryId,
       subjectId = null,
       title,
-      subject = null,
-      year = 1,
       duration_sec = 3600,
       is_published = false,
       credit_cost = 0,
@@ -76,8 +72,6 @@ export async function createQuiz(quizData: QuizCreateInput) {
       category_id: categoryId,
       subject_id: validSubjectId,
       title: title.trim(),
-      subject: subject ? subject.trim() : null,
-      year: Number(year) || 1,
       duration_sec: Number(duration_sec) || 3600,
       is_published: Boolean(is_published),
       credit_cost: Number(credit_cost) || 0,
@@ -178,7 +172,6 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
       category_id: input.categoryId,
       subject_id: validSubjectId,
       title: input.title.trim(),
-      subject: input.subject ? input.subject.trim() : null,
       duration_sec: Number(input.durationSec) || 3600,
       credit_cost: Number(input.creditCost) || 0,
       is_published: Boolean(input.isPublished),
