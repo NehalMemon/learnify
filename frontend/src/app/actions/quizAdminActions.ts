@@ -49,8 +49,11 @@ export interface SaveFullQuizInput {
 }
 
 export async function createQuiz(quizData: QuizCreateInput) {
+  console.log("STEP 1: Server action createQuiz triggered with data:", quizData);
   try {
     const supabase = await createClient();
+    console.log("STEP 1.5: Supabase client created.");
+
     const {
       id = crypto.randomUUID(),
       categoryId,
@@ -63,7 +66,6 @@ export async function createQuiz(quizData: QuizCreateInput) {
       credit_cost = 0,
     } = quizData;
 
-    // Sanitize subjectId: Empty string or invalid value must be null to avoid UUID casting error
     const validSubjectId =
       subjectId && typeof subjectId === 'string' && subjectId.trim().length > 0
         ? subjectId.trim()
@@ -81,11 +83,15 @@ export async function createQuiz(quizData: QuizCreateInput) {
       credit_cost: Number(credit_cost) || 0,
     };
 
+    console.log("STEP 2: Data validated and ID generated. Preparing DB call with payload:", payload);
+
     const { data, error } = await supabase
       .from('quizzes')
       .insert([payload])
       .select('id')
       .single();
+
+    console.log("STEP 3: DB Call finished. Error:", error, "Result:", data);
 
     if (error) {
       console.error('DB Error (createQuiz):', error);
@@ -103,6 +109,7 @@ export async function createQuiz(quizData: QuizCreateInput) {
 }
 
 export async function addQuestionsToQuiz(quizId: string, questions: QuizQuestionInput[]) {
+  console.log("STEP 1: addQuestionsToQuiz triggered for quizId:", quizId, "Count:", questions.length);
   try {
     const supabase = await createClient();
     const rows = questions.map((question) => ({
@@ -121,10 +128,14 @@ export async function addQuestionsToQuiz(quizId: string, questions: QuizQuestion
       explanation: question.explanation ?? null,
     }));
 
+    console.log("STEP 2: Inserting questions rows into quiz_questions...");
+
     const { data, error } = await supabase
       .from('quiz_questions')
       .insert(rows)
       .select('id');
+
+    console.log("STEP 3: Questions DB insert finished. Error:", error, "Result:", data);
 
     if (error) {
       console.error('DB Error (addQuestionsToQuiz):', error);
@@ -140,14 +151,19 @@ export async function addQuestionsToQuiz(quizId: string, questions: QuizQuestion
 }
 
 export async function saveFullQuiz(input: SaveFullQuizInput) {
+  console.log("STEP 1: Server action saveFullQuiz triggered with input:", JSON.stringify(input, null, 2));
+
   try {
     const supabase = await createClient();
+    console.log("STEP 1.5: Supabase client instantiated successfully.");
 
     if (!input.title || !input.title.trim()) {
+      console.error("EARLY RETURN: Quiz title is missing or empty.");
       return { success: false, error: 'Quiz title is required.' };
     }
 
     if (!input.categoryId) {
+      console.error("EARLY RETURN: Quiz category is missing.");
       return { success: false, error: 'Quiz category is required.' };
     }
 
@@ -168,9 +184,14 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
       is_published: Boolean(input.isPublished),
     };
 
-    const { error: quizError } = await supabase
+    console.log("STEP 2: Data validated & Quiz ID generated:", quizId, "Preparing DB upsert payload:", quizPayload);
+
+    const { data: quizResult, error: quizError } = await supabase
       .from('quizzes')
-      .upsert([quizPayload]);
+      .upsert([quizPayload])
+      .select();
+
+    console.log("STEP 3: Quizzes DB upsert finished. Error:", quizError, "Result:", quizResult);
 
     if (quizError) {
       console.error('DB Error (saveFullQuiz quiz upsert):', quizError);
@@ -178,15 +199,14 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
     }
 
     if (Array.isArray(input.questions) && input.questions.length > 0) {
-      // Clear old questions if editing
+      console.log("STEP 4: Deleting existing questions for quiz_id:", quizId);
       const { error: delError } = await supabase
         .from('quiz_questions')
         .delete()
         .eq('quiz_id', quizId);
 
       if (delError) {
-        console.error('DB Error (saveFullQuiz delete questions):', delError);
-        // Continue insertion attempt
+        console.error('DB Error (saveFullQuiz delete questions warning):', delError);
       }
 
       const questionRows = input.questions.map((q) => ({
@@ -205,9 +225,14 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
         explanation: q.explanation ?? null,
       }));
 
-      const { error: qError } = await supabase
+      console.log("STEP 5: Inserting nested questions payload:", questionRows.length, "questions.");
+
+      const { data: qResult, error: qError } = await supabase
         .from('quiz_questions')
-        .insert(questionRows);
+        .insert(questionRows)
+        .select();
+
+      console.log("STEP 6: Quiz questions insert finished. Error:", qError, "Result:", qResult);
 
       if (qError) {
         console.error('DB Error (saveFullQuiz questions insert):', qError);
@@ -218,6 +243,8 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
     revalidatePath('/admin/quizzes');
     revalidatePath('/admin/quizzes/library');
 
+    console.log("STEP 7: saveFullQuiz completed successfully for quizId:", quizId);
+
     return {
       success: true,
       quizId,
@@ -227,18 +254,22 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error while saving quiz';
-    console.error('saveFullQuiz unexpected error:', error);
+    console.error('saveFullQuiz unexpected error caught:', error);
     return { success: false, error: message };
   }
 }
 
 export async function publishQuiz(quizId: string) {
+  console.log("STEP 1: publishQuiz triggered for quizId:", quizId);
   try {
     const supabase = await createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('quizzes')
       .update({ is_published: true })
-      .eq('id', quizId);
+      .eq('id', quizId)
+      .select();
+
+    console.log("STEP 2: publishQuiz finished. Error:", error, "Result:", data);
 
     if (error) {
       console.error('DB Error (publishQuiz):', error);
