@@ -601,26 +601,31 @@ const deleteCategory = async (req, res, next) => {
  */
 const createQuiz = async (req, res, next) => {
   try {
-    const { title, categoryId, subject, year, durationSec, questions } = req.body;
+    const { title, categoryId, subjectId, subject, year, durationSec, isPublished, creditCost, questions } = req.body;
 
     const category = await prisma.quizCategory.findUnique({ where: { id: categoryId } });
     if (!category) {
       return res.status(404).json({ success: false, message: 'Quiz category not found.' });
     }
 
+    const id = crypto.randomUUID();
+    const validSubjectId = subjectId && String(subjectId).trim().length > 0 ? String(subjectId).trim() : null;
+
     // Map over the incoming questions and transform polymorphic types
-    const transformedQuestions = questions.map((q) => transformQuestion(q));
+    const transformedQuestions = (questions || []).map((q) => transformQuestion(q));
 
     // Create the Quiz and all nested Questions in a single atomic database write.
-    // questions: { create: transformedQuestionsArray }
     const quiz = await prisma.quiz.create({
       data: {
+        id,
         title: title.trim(),
         categoryId,
+        subjectId: validSubjectId,
         subject: subject?.trim() || null,
         year: year !== undefined ? Number(year) : 1,
         durationSec: durationSec !== undefined ? Number(durationSec) : 3600,
-        isPublished: true,
+        isPublished: isPublished !== undefined ? Boolean(isPublished) : true,
+        creditCost: creditCost !== undefined ? Number(creditCost) : 0,
         questions: {
           create: transformedQuestions,
         },
@@ -632,12 +637,12 @@ const createQuiz = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: `Quiz "${quiz.title}" created with ${quiz.questions.length} question(s).`,
+      message: `Quiz "${quiz.title}" ${quiz.isPublished ? 'published' : 'saved as draft'} with ${quiz.questions.length} question(s).`,
       data: quiz,
     });
   } catch (error) {
     logger.error({ err: error, path: req.originalUrl }, '[AdminQuizController] createQuiz failed');
-    next(error);
+    return res.status(500).json({ success: false, message: error.message || 'Quiz creation failed.' });
   }
 };
 

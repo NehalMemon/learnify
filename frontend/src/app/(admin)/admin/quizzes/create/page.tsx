@@ -11,6 +11,7 @@ import {
   type QuizCategoryWithSubjects,
   type QuizSubject,
 } from "@/app/actions/taxonomyActions";
+import { saveFullQuiz } from "@/app/actions/quizAdminActions";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -150,32 +151,71 @@ export default function CreateQuizPage() {
     setStep(2);
   };
 
-  /* ── Final publish ───────────────────────────────────────────── */
-  const onPublish = async (formData: QuizForm) => {
-    if (!formData.questions || formData.questions.length === 0) {
+  /* ── Save Quiz (Draft or Publish) ────────────────────────────── */
+  const handleSaveQuiz = async (isPublished: boolean) => {
+    const formData = getValues();
+    if (!formData.title || !formData.title.trim()) {
+      toast.error("Quiz title is required.");
+      return;
+    }
+    if (!formData.categoryId) {
+      toast.error("Please select a category.");
+      return;
+    }
+    if (isPublished && (!formData.questions || formData.questions.length === 0)) {
       toast.error("You must add at least one question to publish this quiz.");
       return;
     }
+
     setIsPublishing(true);
+
+    const formattedQuestions = (formData.questions || []).map((q) => ({
+      type: (q.type as any) || 'SINGLE_CHOICE',
+      question_text: q.questionText || '',
+      option_a: q.optionA || null,
+      option_b: q.optionB || null,
+      option_c: q.optionC || null,
+      option_d: q.optionD || null,
+      correct_option: q.correctOption || 'A',
+      explanation: q.explanation || null,
+      content: {
+        optionA: q.optionA,
+        optionB: q.optionB,
+        optionC: q.optionC,
+        optionD: q.optionD,
+        matchA: q.matchA,
+        matchB: q.matchB,
+        matchC: q.matchC,
+        matchD: q.matchD,
+      },
+      correct_answer: { value: q.correctOption },
+    }));
+
     try {
-      const payload = {
-        title: formData.title,
-        description: formData.description,
+      const validSubjectId =
+        formData.subjectId && formData.subjectId.trim().length > 0
+          ? formData.subjectId.trim()
+          : null;
+
+      const res = await saveFullQuiz({
+        title: formData.title.trim(),
         categoryId: formData.categoryId,
-        subjectId: formData.subjectId || null,
-        durationSec: 60 * 60,
-        questions: formData.questions,
-      };
-      const res = await apiClient.post<{ success: boolean; message: string }>(
-        "/admin/quizzes/full",
-        payload,
-      );
-      toast.success(res.data.message ?? "Quiz published!");
-      setTimeout(() => router.push("/admin/quizzes"), 800);
+        subjectId: validSubjectId,
+        durationSec: 3600,
+        creditCost: 0,
+        isPublished,
+        questions: formattedQuestions,
+      });
+
+      if (!res.success) {
+        toast.error(res.error || "Failed to save quiz.");
+        return;
+      }
+
+      toast.success(res.message || (isPublished ? "Quiz published!" : "Draft saved successfully!"));
+      setTimeout(() => router.push("/admin/quizzes/library"), 800);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? "Failed to publish quiz.";
+      const msg = err instanceof Error ? err.message : "Failed to save quiz.";
       toast.error(msg);
     } finally {
       setIsPublishing(false);
@@ -369,7 +409,10 @@ export default function CreateQuizPage() {
    * ═══════════════════════════════════════════════════════════════ */
   const renderStep2 = () => (
     <form
-      onSubmit={handleSubmit(onPublish)}
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSaveQuiz(true);
+      }}
       className="flex flex-col h-[calc(100vh-64px)] w-full bg-white"
     >
       {/* ── Top Action Bar ───────────────────────────────────────── */}
@@ -395,8 +438,9 @@ export default function CreateQuizPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => toast.success("Draft saved!")}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-900"
+            disabled={isPublishing}
+            onClick={() => handleSaveQuiz(false)}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
           >
             Save Draft
           </button>
