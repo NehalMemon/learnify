@@ -36,16 +36,14 @@ export function PublishQuizModal({
   };
 
   const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawVal = e.target.value;
-    if (rawVal === '') {
+    const rawValue = e.target.value;
+    if (rawValue === '') {
       setDurationMinutes(1);
       return;
     }
-    const parsed = parseInt(rawVal, 10);
-    if (isNaN(parsed) || parsed < 1) {
-      setDurationMinutes(1);
-    } else {
-      setDurationMinutes(parsed);
+    const parsedValue = parseInt(rawValue, 10);
+    if (!isNaN(parsedValue)) {
+      setDurationMinutes(Math.max(1, parsedValue));
     }
   };
 
@@ -59,16 +57,14 @@ export function PublishQuizModal({
   };
 
   const handleCreditsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawVal = e.target.value;
-    if (rawVal === '') {
+    const rawValue = e.target.value;
+    if (rawValue === '') {
       setCreditCost(0);
       return;
     }
-    const parsed = parseInt(rawVal, 10);
-    if (isNaN(parsed) || parsed < 0) {
-      setCreditCost(0);
-    } else {
-      setCreditCost(parsed);
+    const parsedValue = parseInt(rawValue, 10);
+    if (!isNaN(parsedValue)) {
+      setCreditCost(Math.max(0, parsedValue));
     }
   };
 
@@ -155,6 +151,7 @@ export function PublishQuizModal({
                 min={1}
                 max={1440}
                 value={durationMinutes}
+                onFocus={(e) => e.target.select()}
                 onChange={handleDurationChange}
                 placeholder="60"
                 required
@@ -206,6 +203,7 @@ export function PublishQuizModal({
                 min={0}
                 max={10000}
                 value={creditCost}
+                onFocus={(e) => e.target.select()}
                 onChange={handleCreditsChange}
                 placeholder="0"
                 required
