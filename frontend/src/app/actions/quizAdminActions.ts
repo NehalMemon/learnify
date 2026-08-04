@@ -254,13 +254,25 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
   }
 }
 
-export async function publishQuiz(quizId: string) {
-  console.log("STEP 1: publishQuiz triggered for quizId:", quizId);
+export async function publishQuiz(
+  quizId: string,
+  creditCost: number = 0,
+  durationMinutes: number = 60
+) {
+  console.log("STEP 1: publishQuiz triggered for quizId:", quizId, "creditCost:", creditCost, "durationMinutes:", durationMinutes);
   try {
     const supabase = await createClient();
+    const durationSec = Math.max(1, Number(durationMinutes) || 60) * 60;
+    const cost = Math.max(0, Number(creditCost) || 0);
+
     const { data, error } = await supabase
       .from('quizzes')
-      .update({ is_published: true, updated_at: new Date().toISOString() })
+      .update({
+        is_published: true,
+        credit_cost: cost,
+        duration_sec: durationSec,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', quizId)
       .select();
 

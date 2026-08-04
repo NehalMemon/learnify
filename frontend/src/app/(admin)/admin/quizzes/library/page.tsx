@@ -18,11 +18,12 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
-import { getAdminQuizzes } from '@/app/actions/quizAdminActions';
+import { getAdminQuizzes, publishQuiz } from '@/app/actions/quizAdminActions';
 import {
   getCategoriesWithSubjects,
   type QuizCategoryWithSubjects,
 } from '@/app/actions/taxonomyActions';
+import { PublishQuizModal } from '@/components/admin/PublishQuizModal';
 import { TaxonomyManager } from '@/components/admin/dashboard/TaxonomyManager';
 import { Spinner } from '@/components/ui/Spinner';
 import { adminApi } from '@/lib/api';
@@ -260,22 +261,74 @@ export default function QuizLibraryPage() {
     }
   };
 
-  const handleToggleStatus = async (quizId: string, currentStatus: boolean) => {
-    const previousQuizzes = allQuizzes;
+  const [publishModalTarget, setPublishModalTarget] = useState<{
+    id: string;
+    durationMin: number;
+    creditCost: number;
+  } | null>(null);
+  const [isPublishingModal, setIsPublishingModal] = useState(false);
 
+  const handleToggleStatus = async (quizId: string, currentStatus: boolean) => {
+    // If moving from Draft -> Published, prompt for duration & credit cost in modal
+    if (!currentStatus) {
+      const quiz = allQuizzes.find((q) => q.id === quizId);
+      const initialMin = quiz?.duration_sec ? Math.round(quiz.duration_sec / 60) : 60;
+      setPublishModalTarget({
+        id: quizId,
+        durationMin: initialMin || 60,
+        creditCost: 0,
+      });
+      return;
+    }
+
+    // Moving from Published -> Draft
+    const previousQuizzes = allQuizzes;
     setAllQuizzes((prev) =>
       prev.map((quiz) =>
-        quiz.id === quizId ? { ...quiz, is_published: !currentStatus } : quiz
+        quiz.id === quizId ? { ...quiz, is_published: false } : quiz
       )
     );
 
     try {
-      await adminApi.toggleQuizStatus(quizId, { isPublished: !currentStatus });
-      toast.success(`Quiz ${!currentStatus ? 'published' : 'moved to draft'}`);
+      await adminApi.toggleQuizStatus(quizId, { isPublished: false });
+      toast.success('Quiz moved to draft');
       await fetchQuizzes({ silent: true });
     } catch {
       setAllQuizzes(previousQuizzes);
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleConfirmPublishModal = async ({
+    durationMinutes,
+    creditCost,
+  }: {
+    durationMinutes: number;
+    creditCost: number;
+  }) => {
+    if (!publishModalTarget) return;
+
+    setIsPublishingModal(true);
+    try {
+      const res = await publishQuiz(
+        publishModalTarget.id,
+        creditCost,
+        durationMinutes
+      );
+
+      if (!res.success) {
+        toast.error(res.error || 'Failed to publish quiz');
+        return;
+      }
+
+      toast.success(res.message || 'Quiz published successfully!');
+      setPublishModalTarget(null);
+      await fetchQuizzes({ silent: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to publish quiz';
+      toast.error(msg);
+    } finally {
+      setIsPublishingModal(false);
     }
   };
 
@@ -611,6 +664,16 @@ export default function QuizLibraryPage() {
         isOpen={isTaxonomyOpen}
         onClose={() => setIsTaxonomyOpen(false)}
         onTaxonomyChange={fetchQuizzes}
+      />
+
+      {/* Publish Quiz Modal */}
+      <PublishQuizModal
+        isOpen={Boolean(publishModalTarget)}
+        onClose={() => setPublishModalTarget(null)}
+        isSubmitting={isPublishingModal}
+        initialDurationMinutes={publishModalTarget?.durationMin || 60}
+        initialCreditCost={publishModalTarget?.creditCost || 0}
+        onConfirm={handleConfirmPublishModal}
       />
     </div>
   );

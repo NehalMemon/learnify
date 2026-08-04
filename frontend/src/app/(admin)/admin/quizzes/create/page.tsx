@@ -12,6 +12,7 @@ import {
   type QuizSubject,
 } from "@/app/actions/taxonomyActions";
 import { saveFullQuiz } from "@/app/actions/quizAdminActions";
+import { PublishQuizModal } from "@/components/admin/PublishQuizModal";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -88,6 +89,7 @@ export default function CreateQuizPage() {
   const [step, setStep] = useState<1 | 2>(1);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   /* ── React Hook Form ─────────────────────────────────────────── */
   const {
@@ -151,8 +153,30 @@ export default function CreateQuizPage() {
     setStep(2);
   };
 
+  /* ── Open Publish Modal validation ────────────────────────────── */
+  const openPublishModal = () => {
+    const formData = getValues();
+    if (!formData.title || !formData.title.trim()) {
+      toast.error("Quiz title is required.");
+      return;
+    }
+    if (!formData.categoryId) {
+      toast.error("Please select a category.");
+      return;
+    }
+    if (!formData.questions || formData.questions.length === 0) {
+      toast.error("You must add at least one question to publish this quiz.");
+      return;
+    }
+    setIsPublishModalOpen(true);
+  };
+
   /* ── Save Quiz (Draft or Publish) ────────────────────────────── */
-  const handleSaveQuiz = async (isPublished: boolean) => {
+  const handleSaveQuiz = async (
+    isPublished: boolean,
+    durationMinutes: number = 60,
+    creditCost: number = 0
+  ) => {
     const formData = getValues();
 
     if (!formData.title || !formData.title.trim()) {
@@ -197,17 +221,20 @@ export default function CreateQuizPage() {
         ? formData.subjectId.trim()
         : null;
 
+    const durationSec = Math.max(1, Number(durationMinutes) || 60) * 60;
+    const cost = Math.max(0, Number(creditCost) || 0);
+
     const payload = {
       title: formData.title.trim(),
       categoryId: formData.categoryId,
       subjectId: validSubjectId,
-      durationSec: 3600,
-      creditCost: 0,
+      durationSec,
+      creditCost: cost,
       isPublished,
       questions: formattedQuestions,
     };
 
-    console.log("CLIENT: Attempting to save draft with data:", payload);
+    console.log("CLIENT: Attempting to save quiz with data:", payload);
 
     try {
       const response = await saveFullQuiz(payload);
@@ -218,7 +245,7 @@ export default function CreateQuizPage() {
         return;
       }
 
-      toast.success(response?.message || (isPublished ? "Quiz published successfully!" : "Quiz saved successfully!"));
+      toast.success(response?.message || (isPublished ? "Quiz published successfully!" : "Quiz draft saved successfully!"));
       setTimeout(() => router.push("/admin/quizzes/library"), 800);
     } catch (error) {
       console.error("CLIENT ERROR:", error);
@@ -417,7 +444,7 @@ export default function CreateQuizPage() {
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        handleSaveQuiz(true);
+        openPublishModal();
       }}
       className="flex flex-col h-[calc(100vh-64px)] w-full bg-white"
     >
@@ -451,8 +478,9 @@ export default function CreateQuizPage() {
             Save Draft
           </button>
           <button
-            type="submit"
+            type="button"
             disabled={isPublishing}
+            onClick={openPublishModal}
             className="rounded-lg bg-purple-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isPublishing ? (
@@ -822,5 +850,20 @@ export default function CreateQuizPage() {
   /* ═══════════════════════════════════════════════════════════════
    *  Render
    * ═══════════════════════════════════════════════════════════════ */
-  return <>{step === 1 ? renderStep1() : renderStep2()}</>;
+  return (
+    <>
+      {step === 1 ? renderStep1() : renderStep2()}
+      <PublishQuizModal
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        isSubmitting={isPublishing}
+        initialDurationMinutes={60}
+        initialCreditCost={0}
+        onConfirm={async ({ durationMinutes, creditCost }) => {
+          await handleSaveQuiz(true, durationMinutes, creditCost);
+          setIsPublishModalOpen(false);
+        }}
+      />
+    </>
+  );
 }
