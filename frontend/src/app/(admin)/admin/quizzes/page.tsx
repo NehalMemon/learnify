@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'react-hot-toast';
 import {
   BookOpen,
   Clock3,
+  Download,
   FileEdit,
   FolderPlus,
+  Pencil,
   Plus,
   RefreshCw,
   Settings2,
@@ -24,6 +27,7 @@ interface AdminQuiz {
   title: string;
   is_published?: boolean | null;
   duration_sec?: number | null;
+  created_at?: string | null;
 }
 
 export default function QuizBuilderHubPage() {
@@ -58,6 +62,45 @@ export default function QuizBuilderHubPage() {
   const publishedCount = allQuizzes.filter((quiz) => Boolean(quiz.is_published)).length;
   const draftCount = totalQuizzes - publishedCount;
   const timedCount = allQuizzes.filter((quiz) => Boolean(quiz.duration_sec && quiz.duration_sec > 0)).length;
+  const recentQuizzes = allQuizzes.slice(0, 5);
+
+  const handleExportQuizzes = () => {
+    if (allQuizzes.length === 0) {
+      toast.error('No quizzes to export');
+      return;
+    }
+
+    const csvCell = (value: string | number | boolean | null | undefined): string =>
+      `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+    const headers = ['Title', 'Duration', 'Status', 'Created At'];
+    const csvContent = [
+      headers.map(csvCell).join(','),
+      ...allQuizzes.map((quiz) =>
+        [
+          quiz.title,
+          quiz.duration_sec ? `${Math.round(quiz.duration_sec / 60)} min` : 'Not set',
+          quiz.is_published ? 'Published' : 'Draft',
+          quiz.created_at || '',
+        ]
+          .map(csvCell)
+          .join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `quizzes_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${allQuizzes.length} quizzes`);
+  };
 
   return (
     <div className="mx-auto w-full max-w-7xl pb-10 font-sans text-[#191c1e] antialiased">
@@ -92,6 +135,14 @@ export default function QuizBuilderHubPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
+          </button>
+          <button
+            type="button"
+            onClick={handleExportQuizzes}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
           </button>
           <Link
             href="/admin/quizzes/library"
@@ -276,6 +327,99 @@ export default function QuizBuilderHubPage() {
             </div>
           </Link>
         </div>
+      </div>
+
+      {/* ── Recently Created Quizzes Section ───────────────────────────── */}
+      <div className="mt-10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight text-[#191c1e]">
+              Recently Created
+            </h2>
+            <p className="text-xs text-[#777586]">
+              Quickly edit or review your latest quiz additions
+            </p>
+          </div>
+          <Link
+            href="/admin/quizzes/library"
+            className="text-xs font-semibold text-[#3525cd] hover:underline"
+          >
+            View All in Library →
+          </Link>
+        </div>
+
+        {isLoading ? (
+          <div className="flex min-h-28 items-center justify-center rounded-2xl border border-[#e4e6ef] bg-white">
+            <Spinner size="md" />
+          </div>
+        ) : recentQuizzes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#cfd1dc] bg-white p-8 text-center text-xs text-[#777586]">
+            No quizzes created yet. Use the creation tools above to create your first quiz!
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-[#e4e6ef] bg-white shadow-xs">
+            <div className="divide-y divide-[#eceef5]">
+              {recentQuizzes.map((quiz) => {
+                const isPublished = Boolean(quiz.is_published);
+                return (
+                  <div
+                    key={quiz.id}
+                    className="flex flex-col gap-3 px-6 py-4 transition hover:bg-[#fbfbfd] sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f1f0ff] text-[#3525cd]">
+                        <BookOpen className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-[#191c1e]">
+                          {quiz.title}
+                        </h3>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-[#777586]">
+                          {quiz.duration_sec && quiz.duration_sec > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock3 className="h-3 w-3" />
+                              {Math.round(quiz.duration_sec / 60)} min
+                            </span>
+                          ) : null}
+                          {quiz.created_at ? (
+                            <span>
+                              Created {new Date(quiz.created_at).toLocaleDateString()}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                          isPublished
+                            ? 'bg-emerald-500/10 text-emerald-700'
+                            : 'bg-gray-500/10 text-gray-600'
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            isPublished ? 'bg-emerald-500' : 'bg-gray-400'
+                          }`}
+                        />
+                        {isPublished ? 'Published' : 'Draft'}
+                      </span>
+
+                      <Link
+                        href={`/admin/quizzes/${quiz.id}/edit`}
+                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-[#dadce5] bg-white px-3.5 text-xs font-semibold text-[#3525cd] transition hover:bg-[#f1f0ff]"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Slide-over Modal for Taxonomy Management */}

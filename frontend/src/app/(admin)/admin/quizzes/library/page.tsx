@@ -310,14 +310,6 @@ export default function QuizLibraryPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
             type="button"
-            onClick={() => setIsTaxonomyOpen(true)}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-          >
-            <FolderPlus className="h-4 w-4 text-[#3525cd]" />
-            Manage Categories
-          </button>
-          <button
-            type="button"
             onClick={() => fetchQuizzes({ silent: true })}
             disabled={isRefreshing}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60"
@@ -325,23 +317,8 @@ export default function QuizLibraryPage() {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button
-            type="button"
-            onClick={handleExportQuizzes}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
           <Link
-            href="/admin/quizzes/create/ai"
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd]/10 px-4 text-sm font-semibold text-[#3525cd] border border-[#3525cd]/20 transition hover:bg-[#3525cd]/20"
-          >
-            <Sparkles className="h-4 w-4" />
-            Create with AI
-          </Link>
-          <Link
-            href="/admin/quizzes/create"
+            href="/admin/quizzes/builder"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
@@ -619,7 +596,7 @@ export default function QuizLibraryPage() {
           </p>
           {!submittedSearch && !selectedCategoryId && !selectedSubjectId ? (
             <Link
-              href="/admin/quizzes/create"
+              href="/admin/quizzes/builder"
               className="mt-6 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
             >
               <Plus className="h-4 w-4" />
