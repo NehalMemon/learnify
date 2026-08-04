@@ -42,7 +42,7 @@ function QuestionBankViewerContent() {
   const searchParams = useSearchParams();
 
   const categoryId = searchParams.get('categoryId') || '';
-  const subjectId = searchParams.get('subjectId') || '';
+  const initialSubjectId = searchParams.get('subjectId') || '';
 
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
@@ -51,6 +51,7 @@ function QuestionBankViewerContent() {
   const [error, setError] = useState<string | null>(null);
 
   // Local Filters State
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -75,7 +76,6 @@ function QuestionBankViewerContent() {
       const [data] = await Promise.all([
         getBankQuestions({
           category_id: categoryId || undefined,
-          subject_id: subjectId || undefined,
         }),
         fetchTaxonomy(),
       ]);
@@ -92,27 +92,44 @@ function QuestionBankViewerContent() {
 
   useEffect(() => {
     fetchQuestions();
-  }, [categoryId, subjectId]);
+  }, [categoryId]);
 
-  const categoryName = useMemo(() => {
-    if (!categoryId) return 'All Categories';
-    const cat = taxonomy.find((c) => c.id === categoryId);
-    return cat ? cat.name : 'Category Vault';
+  const activeCategory = useMemo(() => {
+    return taxonomy.find((c) => c.id === categoryId);
   }, [taxonomy, categoryId]);
 
-  const subjectName = useMemo(() => {
-    if (!subjectId) return 'All Subjects';
-    for (const cat of taxonomy) {
-      const subj = cat.subjects.find((s) => s.id === subjectId);
-      if (subj) return subj.name;
+  const categoryName = useMemo(() => {
+    if (activeCategory) return activeCategory.name;
+    if (questions.length > 0 && questions[0].category) {
+      return getRelationName(questions[0].category) || 'Category Vault';
     }
-    return 'Subject Vault';
-  }, [taxonomy, subjectId]);
+    return 'Category Vault';
+  }, [activeCategory, questions]);
+
+  const availableSubjects = useMemo(() => {
+    if (activeCategory) return activeCategory.subjects;
+    // Fallback: extract unique subjects from fetched questions
+    const map = new Map<string, string>();
+    questions.forEach((q) => {
+      if (q.subject_id) {
+        const name = getRelationName(q.subject) || 'Subject';
+        map.set(q.subject_id, name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [activeCategory, questions]);
 
   const filteredQuestions = useMemo(() => {
     const query = submittedSearch.trim().toLowerCase();
 
     return questions.filter((item) => {
+      // Subject filter
+      if (selectedSubjectId && item.subject_id !== selectedSubjectId) {
+        const subjName = availableSubjects.find((s) => s.id === selectedSubjectId)?.name;
+        const quizSubjName = getRelationName(item.subject);
+        if (quizSubjName !== subjName) return false;
+      }
+
       // Type filter
       if (selectedType && item.type !== selectedType) {
         return false;
@@ -138,7 +155,7 @@ function QuestionBankViewerContent() {
 
       return true;
     });
-  }, [questions, selectedType, selectedDifficulty, submittedSearch]);
+  }, [questions, selectedSubjectId, selectedType, selectedDifficulty, submittedSearch, availableSubjects]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +163,7 @@ function QuestionBankViewerContent() {
   };
 
   const handleResetFilters = () => {
+    setSelectedSubjectId('');
     setSelectedType('');
     setSelectedDifficulty('');
     setSearchQuery('');
@@ -223,7 +241,7 @@ function QuestionBankViewerContent() {
     }
   };
 
-  const isFiltered = Boolean(selectedType || selectedDifficulty || searchQuery || submittedSearch);
+  const isFiltered = Boolean(selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch);
 
   return (
     <div className="mx-auto w-full max-w-6xl pb-12 font-sans text-[#191c1e] antialiased">
@@ -235,21 +253,21 @@ function QuestionBankViewerContent() {
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3525cd] transition hover:underline mb-2"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            ← Back to Directory
+            ← Back to Category Library
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-[#191c1e] md:text-3xl">
-              {subjectName}
+              {categoryName}
             </h1>
             <span className="rounded-full bg-[#f1f0ff] px-3 py-0.5 text-xs font-bold text-[#3525cd]">
-              {categoryName}
+              Category Vault
             </span>
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700 border border-slate-200">
               {questions.length} question{questions.length === 1 ? '' : 's'}
             </span>
           </div>
           <p className="mt-1 text-xs text-[#696778]">
-            Viewing specific bank vault entries for {categoryName} → {subjectName}
+            Master question repository for category: {categoryName}
           </p>
         </div>
 
@@ -261,13 +279,13 @@ function QuestionBankViewerContent() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            Refresh Vault
           </button>
 
           <Link
             href={`/admin/question-bank/builder?categoryId=${encodeURIComponent(
               categoryId
-            )}&subjectId=${encodeURIComponent(subjectId)}`}
+            )}${selectedSubjectId ? `&subjectId=${encodeURIComponent(selectedSubjectId)}` : ''}`}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
@@ -276,11 +294,11 @@ function QuestionBankViewerContent() {
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Horizontal Multi-Filter Bar */}
       <div className="mb-6 rounded-2xl border border-[#e4e6ef] bg-white p-4 shadow-xs">
-        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center w-full">
+        <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-center w-full">
           {/* 1. Search Query Input */}
-          <div className="relative col-span-1 md:col-span-2">
+          <div className="relative col-span-1 lg:col-span-2">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
             <input
               type="text"
@@ -291,8 +309,24 @@ function QuestionBankViewerContent() {
             />
           </div>
 
-          {/* 2. Type Filter */}
-          <div>
+          {/* 2. Subject Dropdown */}
+          <div className="w-full">
+            <select
+              value={selectedSubjectId}
+              onChange={(e) => setSelectedSubjectId(e.target.value)}
+              className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-xs font-medium text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+            >
+              <option value="">All Subjects</option>
+              {availableSubjects.map((subj) => (
+                <option key={subj.id} value={subj.id}>
+                  {subj.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Question Type Dropdown */}
+          <div className="w-full">
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
@@ -306,8 +340,8 @@ function QuestionBankViewerContent() {
             </select>
           </div>
 
-          {/* 3. Difficulty & Reset */}
-          <div className="flex items-center gap-2 w-full">
+          {/* 4. Difficulty & Action Buttons */}
+          <div className="flex items-center gap-2 w-full col-span-1 lg:col-span-1">
             <select
               value={selectedDifficulty}
               onChange={(e) => setSelectedDifficulty(e.target.value)}
@@ -355,14 +389,14 @@ function QuestionBankViewerContent() {
             <Database className="mx-auto h-10 w-10 text-[#8d8b99]" />
             <h3 className="mt-4 text-base font-bold text-[#191c1e]">No questions found in this vault</h3>
             <p className="mt-1 text-xs leading-5 text-[#696778]">
-              {submittedSearch || selectedType || selectedDifficulty
+              {submittedSearch || selectedSubjectId || selectedType || selectedDifficulty
                 ? 'No questions match your current filter settings. Try resetting filters.'
-                : 'Start populating this specific subject vault by adding questions.'}
+                : 'Start populating this category vault by adding questions.'}
             </p>
             <Link
               href={`/admin/question-bank/builder?categoryId=${encodeURIComponent(
                 categoryId
-              )}&subjectId=${encodeURIComponent(subjectId)}`}
+              )}${selectedSubjectId ? `&subjectId=${encodeURIComponent(selectedSubjectId)}` : ''}`}
               className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white transition hover:bg-[#2f20b8]"
             >
               <Plus className="h-4 w-4" />
@@ -381,7 +415,7 @@ function QuestionBankViewerContent() {
                   onClick={handleResetFilters}
                   className="text-xs font-semibold text-[#3525cd] hover:underline"
                 >
-                  Clear filters
+                  Clear all filters
                 </button>
               ) : null}
             </div>
@@ -389,6 +423,8 @@ function QuestionBankViewerContent() {
             <div className="overflow-hidden rounded-2xl border border-[#e4e6ef] bg-white shadow-xs">
               <div className="divide-y divide-[#eceef5]">
                 {filteredQuestions.map((q) => {
+                  const subjName = getRelationName(q.subject);
+
                   const optionsList: { id: string; text: string }[] =
                     Array.isArray(q.content?.options)
                       ? q.content.options
@@ -420,6 +456,11 @@ function QuestionBankViewerContent() {
                           <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
                             {q.points || 1} pt{q.points === 1 ? '' : 's'}
                           </span>
+                          {subjName ? (
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
+                              {subjName}
+                            </span>
+                          ) : null}
                         </div>
 
                         <button
