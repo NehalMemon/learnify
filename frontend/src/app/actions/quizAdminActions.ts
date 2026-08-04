@@ -305,3 +305,5 @@ export async function getAdminQuizzes() {
     throw error instanceof Error ? error : new Error('Unexpected error while fetching admin quizzes');
   }
 }
+
+export const saveQuiz = saveFullQuiz;

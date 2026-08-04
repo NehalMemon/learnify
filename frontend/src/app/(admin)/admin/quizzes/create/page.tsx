@@ -154,20 +154,16 @@ export default function CreateQuizPage() {
   /* ── Save Quiz (Draft or Publish) ────────────────────────────── */
   const handleSaveQuiz = async (isPublished: boolean) => {
     const formData = getValues();
-    console.log("FRONTEND: handleSaveQuiz called. isPublished:", isPublished, "formData:", formData);
 
     if (!formData.title || !formData.title.trim()) {
-      console.log("FRONTEND validation failed: Title is required.");
       toast.error("Quiz title is required.");
       return;
     }
     if (!formData.categoryId) {
-      console.log("FRONTEND validation failed: Category is required.");
       toast.error("Please select a category.");
       return;
     }
     if (isPublished && (!formData.questions || formData.questions.length === 0)) {
-      console.log("FRONTEND validation failed: No questions for publish.");
       toast.error("You must add at least one question to publish this quiz.");
       return;
     }
@@ -196,39 +192,37 @@ export default function CreateQuizPage() {
       correct_answer: { value: q.correctOption },
     }));
 
+    const validSubjectId =
+      formData.subjectId && formData.subjectId.trim().length > 0
+        ? formData.subjectId.trim()
+        : null;
+
+    const payload = {
+      title: formData.title.trim(),
+      categoryId: formData.categoryId,
+      subjectId: validSubjectId,
+      durationSec: 3600,
+      creditCost: 0,
+      isPublished,
+      questions: formattedQuestions,
+    };
+
+    console.log("CLIENT: Attempting to save draft with data:", payload);
+
     try {
-      const validSubjectId =
-        formData.subjectId && formData.subjectId.trim().length > 0
-          ? formData.subjectId.trim()
-          : null;
+      const response = await saveFullQuiz(payload);
+      console.log("CLIENT: Action response:", response);
 
-      const payload = {
-        title: formData.title.trim(),
-        categoryId: formData.categoryId,
-        subjectId: validSubjectId,
-        durationSec: 3600,
-        creditCost: 0,
-        isPublished,
-        questions: formattedQuestions,
-      };
-
-      console.log("FRONTEND: Invoking saveFullQuiz server action with payload:", payload);
-
-      const res = await saveFullQuiz(payload);
-
-      console.log("FRONTEND: Action response:", res);
-
-      if (!res.success) {
-        toast.error(res.error || "Failed to save quiz.");
+      if (response?.error || !response?.success) {
+        toast.error(response?.error || "Failed to save quiz.");
         return;
       }
 
-      toast.success(res.message || (isPublished ? "Quiz published!" : "Draft saved successfully!"));
+      toast.success(response?.message || (isPublished ? "Quiz published successfully!" : "Quiz saved successfully!"));
       setTimeout(() => router.push("/admin/quizzes/library"), 800);
-    } catch (err: unknown) {
-      console.error("FRONTEND: Exception caught in handleSaveQuiz:", err);
-      const msg = err instanceof Error ? err.message : "Failed to save quiz.";
-      toast.error(msg);
+    } catch (error) {
+      console.error("CLIENT ERROR:", error);
+      toast.error("Something went wrong on the client.");
     } finally {
       setIsPublishing(false);
     }
