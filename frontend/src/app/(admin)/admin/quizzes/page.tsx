@@ -225,7 +225,7 @@ export default function QuizBuilderHubPage() {
           Creation Tools & Workflows
         </h2>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* 1. Manual Quiz Creator */}
           <Link
             href="/admin/quizzes/create"
@@ -306,26 +306,6 @@ export default function QuizBuilderHubPage() {
               <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
             </div>
           </button>
-
-          {/* 5. Browse Quiz Library */}
-          <Link
-            href="/admin/quizzes/library"
-            className="group flex flex-col justify-between rounded-2xl border border-[#e4e6ef] bg-white p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-[#3525cd]/40 hover:shadow-md md:col-span-2 lg:col-span-2"
-          >
-            <div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 transition group-hover:bg-purple-600 group-hover:text-white">
-                <BookOpen className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-bold text-[#191c1e]">Quiz Library Ledger</h3>
-              <p className="mt-1 text-xs leading-relaxed text-[#696778]">
-                Browse, search, filter, publish, draft, edit, or delete existing assessments from the main catalog.
-              </p>
-            </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-purple-600">
-              <span>Open Quiz Library</span>
-              <span className="ml-1 transition-transform group-hover:translate-x-1">→</span>
-            </div>
-          </Link>
         </div>
       </div>
 
