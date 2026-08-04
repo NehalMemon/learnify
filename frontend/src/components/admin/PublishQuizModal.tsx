@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, Coins, Loader2, Send, X } from 'lucide-react';
+import { Clock, Coins, Loader2, Minus, Plus, Send, X } from 'lucide-react';
 
 interface PublishQuizModalProps {
   isOpen: boolean;
@@ -25,6 +25,52 @@ export function PublishQuizModal({
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  /* Duration Handlers */
+  const incrementDuration = () => {
+    setDurationMinutes((prev) => prev + 1);
+  };
+
+  const decrementDuration = () => {
+    setDurationMinutes((prev) => (prev > 1 ? prev - 1 : 1));
+  };
+
+  const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    if (rawVal === '') {
+      setDurationMinutes(1);
+      return;
+    }
+    const parsed = parseInt(rawVal, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      setDurationMinutes(1);
+    } else {
+      setDurationMinutes(parsed);
+    }
+  };
+
+  /* Credit Cost Handlers */
+  const incrementCredits = () => {
+    setCreditCost((prev) => prev + 1);
+  };
+
+  const decrementCredits = () => {
+    setCreditCost((prev) => (prev > 0 ? prev - 1 : 0));
+  };
+
+  const handleCreditsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    if (rawVal === '') {
+      setCreditCost(0);
+      return;
+    }
+    const parsed = parseInt(rawVal, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      setCreditCost(0);
+    } else {
+      setCreditCost(parsed);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,53 +120,109 @@ export function PublishQuizModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
           {error ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
               {error}
             </div>
           ) : null}
 
-          {/* Quiz Duration Input */}
+          {/* Quiz Duration Stepper Field */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58] mb-1.5">
               Quiz Duration (in minutes) <span className="text-red-500">*</span>
             </label>
-            <div className="relative mt-1.5">
-              <Clock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
+
+            <div className="flex items-center border border-[#dadce5] rounded-xl overflow-hidden bg-[#f7f7fb] transition focus-within:border-[#3525cd] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#3525cd]/15">
+              <div className="pl-3.5 pr-1 text-[#777586] flex items-center justify-center">
+                <Clock className="h-4 w-4" />
+              </div>
+
+              {/* Decrement (-) Button */}
+              <button
+                type="button"
+                onClick={decrementDuration}
+                disabled={durationMinutes <= 1 || isSubmitting}
+                className="flex h-11 w-11 items-center justify-center text-[#4b4a58] transition hover:bg-[#eceef5] active:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed border-r border-[#dadce5]/60"
+                aria-label="Decrement duration"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+
+              {/* Stepper Middle Input */}
               <input
                 type="number"
                 min={1}
                 max={1440}
                 value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                onChange={handleDurationChange}
                 placeholder="60"
                 required
-                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] pl-10 pr-3.5 text-sm font-semibold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                disabled={isSubmitting}
+                className="w-full min-h-11 bg-transparent text-center text-sm font-bold text-[#191c1e] outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
+
+              {/* Increment (+) Button */}
+              <button
+                type="button"
+                onClick={incrementDuration}
+                disabled={isSubmitting}
+                className="flex h-11 w-11 items-center justify-center text-[#4b4a58] transition hover:bg-[#eceef5] active:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed border-l border-[#dadce5]/60"
+                aria-label="Increment duration"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
             <p className="mt-1 text-[11px] text-[#777586]">
-              Time allowed for students to complete this exam (e.g. 60 min).
+              Time allowed for students to complete this exam (minimum 1 min).
             </p>
           </div>
 
-          {/* Credit Cost Input */}
+          {/* Credit Cost Stepper Field */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
+            <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58] mb-1.5">
               Credit Cost <span className="text-red-500">*</span>
             </label>
-            <div className="relative mt-1.5">
-              <Coins className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
+
+            <div className="flex items-center border border-[#dadce5] rounded-xl overflow-hidden bg-[#f7f7fb] transition focus-within:border-[#3525cd] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#3525cd]/15">
+              <div className="pl-3.5 pr-1 text-[#777586] flex items-center justify-center">
+                <Coins className="h-4 w-4" />
+              </div>
+
+              {/* Decrement (-) Button */}
+              <button
+                type="button"
+                onClick={decrementCredits}
+                disabled={creditCost <= 0 || isSubmitting}
+                className="flex h-11 w-11 items-center justify-center text-[#4b4a58] transition hover:bg-[#eceef5] active:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed border-r border-[#dadce5]/60"
+                aria-label="Decrement credits"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+
+              {/* Stepper Middle Input */}
               <input
                 type="number"
                 min={0}
                 max={10000}
                 value={creditCost}
-                onChange={(e) => setCreditCost(Number(e.target.value))}
+                onChange={handleCreditsChange}
                 placeholder="0"
                 required
-                className="min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] pl-10 pr-3.5 text-sm font-semibold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                disabled={isSubmitting}
+                className="w-full min-h-11 bg-transparent text-center text-sm font-bold text-[#191c1e] outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
+
+              {/* Increment (+) Button */}
+              <button
+                type="button"
+                onClick={incrementCredits}
+                disabled={isSubmitting}
+                className="flex h-11 w-11 items-center justify-center text-[#4b4a58] transition hover:bg-[#eceef5] active:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed border-l border-[#dadce5]/60"
+                aria-label="Increment credits"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
             <p className="mt-1 text-[11px] text-[#777586]">
               Number of credits required for student access (0 = Free).
