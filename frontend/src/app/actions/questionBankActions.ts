@@ -83,6 +83,43 @@ export async function createBankQuestion(input: CreateBankQuestionInput) {
   }
 }
 
+export async function createBankQuestionsBatch(items: CreateBankQuestionInput[]) {
+  try {
+    const supabase = await createClient();
+
+    const rows = items.map((input) => ({
+      id: crypto.randomUUID(),
+      category_id: input.category_id || null,
+      subject_id: input.subject_id || null,
+      type: input.type || 'SINGLE_CHOICE',
+      question_text: input.question_text.trim(),
+      points: Number(input.points) || 1,
+      explanation: input.explanation ? input.explanation.trim() : null,
+      difficulty: input.difficulty || 'MEDIUM',
+      tags: Array.isArray(input.tags) ? input.tags : [],
+      content: input.content ?? {},
+      correct_answer: input.correct_answer ?? {},
+    }));
+
+    const { data, error } = await supabase
+      .from('question_bank')
+      .insert(rows)
+      .select('id');
+
+    if (error) {
+      console.error('createBankQuestionsBatch error:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/admin/question-bank');
+    return { success: true, count: data.length };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unexpected error while batch adding questions';
+    console.error('createBankQuestionsBatch unexpected error:', error);
+    return { success: false, error: message };
+  }
+}
+
 export async function getBankQuestions(filters?: {
   category_id?: string;
   subject_id?: string;

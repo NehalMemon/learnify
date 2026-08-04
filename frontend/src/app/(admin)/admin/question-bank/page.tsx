@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import {
+  BookOpen,
   CheckCircle2,
   Database,
   Filter,
+  Layers,
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Tag,
   Trash2,
   X,
@@ -24,7 +28,6 @@ import {
   getCategoriesWithSubjects,
   type QuizCategoryWithSubjects,
 } from '@/app/actions/taxonomyActions';
-import { AddBankQuestionModal } from '@/components/admin/AddBankQuestionModal';
 import { Spinner } from '@/components/ui/Spinner';
 
 function getRelationName(relation?: { name?: string | null } | { name?: string | null }[] | null): string {
@@ -34,6 +37,8 @@ function getRelationName(relation?: { name?: string | null } | { name?: string |
 }
 
 export default function QuestionBankVaultPage() {
+  const router = useRouter();
+
   const [questions, setQuestions] = useState<BankQuestion[]>([]);
   const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,8 +53,10 @@ export default function QuestionBankVaultPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [submittedSearch, setSubmittedSearch] = useState<string>('');
 
-  // Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // Gateway Modal State
+  const [isGatewayModalOpen, setIsGatewayModalOpen] = useState(false);
+  const [gatewayCatId, setGatewayCatId] = useState<string>('');
+  const [gatewaySubjId, setGatewaySubjId] = useState<string>('');
 
   const fetchTaxonomy = async () => {
     try {
@@ -87,6 +94,12 @@ export default function QuestionBankVaultPage() {
     const cat = taxonomy.find((c) => c.id === selectedCategoryId);
     return cat ? cat.subjects : [];
   }, [taxonomy, selectedCategoryId]);
+
+  const gatewayAvailableSubjects = useMemo(() => {
+    if (!gatewayCatId) return [];
+    const cat = taxonomy.find((c) => c.id === gatewayCatId);
+    return cat ? cat.subjects : [];
+  }, [taxonomy, gatewayCatId]);
 
   const filteredQuestions = useMemo(() => {
     const query = submittedSearch.trim().toLowerCase();
@@ -157,6 +170,21 @@ export default function QuestionBankVaultPage() {
     } catch {
       toast.error('Failed to delete question');
     }
+  };
+
+  const handleStartBuilding = () => {
+    if (!gatewayCatId) {
+      toast.error('Please select a target Category first.');
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('categoryId', gatewayCatId);
+    if (gatewaySubjId) {
+      params.set('subjectId', gatewaySubjId);
+    }
+
+    router.push(`/admin/question-bank/builder?${params.toString()}`);
   };
 
   const getDifficultyBadge = (difficulty: QuestionDifficulty) => {
@@ -249,7 +277,11 @@ export default function QuestionBankVaultPage() {
 
           <button
             type="button"
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => {
+              setGatewayCatId('');
+              setGatewaySubjId('');
+              setIsGatewayModalOpen(true);
+            }}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
@@ -263,7 +295,7 @@ export default function QuestionBankVaultPage() {
         {/* Horizontal Top-Bar Filter Card */}
         <div className="w-full rounded-2xl border border-[#e4e6ef] bg-white p-4 shadow-xs">
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-center w-full">
-            {/* 1. Search Query Input (Spans 2 cols on lg) */}
+            {/* 1. Search Query Input */}
             <div className="relative col-span-1 lg:col-span-2">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777586]" />
               <input
@@ -326,7 +358,7 @@ export default function QuestionBankVaultPage() {
               </select>
             </div>
 
-            {/* 5. Difficulty Filter & Search Action Button (Grid item 6) */}
+            {/* 5. Difficulty Filter & Action Buttons */}
             <div className="flex items-center gap-2 w-full">
               <select
                 value={selectedDifficulty}
@@ -361,7 +393,7 @@ export default function QuestionBankVaultPage() {
           </form>
         </div>
 
-        {/* Main Content Area (Stretches Full Width Directly Below Filter Bar) */}
+        {/* Main Content Area */}
         <div className="w-full min-w-0">
           {isLoading ? (
             <div className="flex min-h-72 items-center justify-center rounded-2xl border border-[#e4e6ef] bg-white">
@@ -382,7 +414,11 @@ export default function QuestionBankVaultPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setIsAddModalOpen(true)}
+                onClick={() => {
+                  setGatewayCatId('');
+                  setGatewaySubjId('');
+                  setIsGatewayModalOpen(true);
+                }}
                 className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-sm font-semibold text-white transition hover:bg-[#2f20b8]"
               >
                 <Plus className="h-4 w-4" />
@@ -412,7 +448,6 @@ export default function QuestionBankVaultPage() {
                     const catName = getRelationName(q.category);
                     const subjName = getRelationName(q.subject);
 
-                    // Parse JSONB content & correct answer
                     const optionsList: { id: string; text: string }[] =
                       Array.isArray(q.content?.options)
                         ? q.content.options
@@ -533,13 +568,92 @@ export default function QuestionBankVaultPage() {
         </div>
       </div>
 
-      {/* Add Bank Question Modal */}
-      <AddBankQuestionModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        taxonomy={taxonomy}
-        onSuccess={() => fetchQuestions({ silent: true })}
-      />
+      {/* Gateway Modal for Mass Entry Builder */}
+      {isGatewayModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition-all border border-[#eceef5]">
+            <div className="flex items-center justify-between border-b border-[#eceef5] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-[#191c1e]">Mass Question Builder</h3>
+                  <p className="text-xs text-[#696778]">Select target Category & Subject to begin</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGatewayModalOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[#777586] transition hover:bg-[#f7f7fb] hover:text-[#191c1e]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {/* Category Select */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
+                  Target Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={gatewayCatId}
+                  onChange={(e) => {
+                    setGatewayCatId(e.target.value);
+                    setGatewaySubjId('');
+                  }}
+                  className="mt-1.5 min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-sm font-semibold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                >
+                  <option value="">Select Category...</option>
+                  {taxonomy.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subject Select */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
+                  Target Subject <span className="text-[#777586] font-normal">(Optional)</span>
+                </label>
+                <select
+                  value={gatewaySubjId}
+                  onChange={(e) => setGatewaySubjId(e.target.value)}
+                  disabled={!gatewayCatId || gatewayAvailableSubjects.length === 0}
+                  className="mt-1.5 min-h-11 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3.5 text-sm font-semibold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white disabled:opacity-50"
+                >
+                  <option value="">All / No Specific Subject</option>
+                  {gatewayAvailableSubjects.map((subj) => (
+                    <option key={subj.id} value={subj.id}>
+                      {subj.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t border-[#eceef5]">
+                <button
+                  type="button"
+                  onClick={() => setIsGatewayModalOpen(false)}
+                  className="min-h-10 rounded-xl border border-[#dadce5] bg-white px-4 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleStartBuilding}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-5 text-xs font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
+                >
+                  Start Building →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
