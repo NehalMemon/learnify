@@ -22,7 +22,7 @@ const adminNavItems: NavItem[] = [
   { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree },
   { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
   { href: '/admin/quizzes/library', label: 'Quiz Library', icon: BookOpen },
-  { href: '/admin/questions', label: 'Question Bank', icon: Database },
+  { href: '/admin/question-bank', label: 'Question Bank', icon: Database },
   { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
