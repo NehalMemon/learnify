@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import {
+  ArrowRight,
   BookOpen,
-  CheckCircle2,
   ChevronDown,
-  ChevronRight,
   Database,
   Filter,
   Folder,
@@ -16,12 +16,9 @@ import {
   RefreshCw,
   Search,
   Sparkles,
-  Tag,
-  Trash2,
   X,
 } from 'lucide-react';
 import {
-  deleteBankQuestion,
   getBankQuestions,
   type BankQuestion,
   type BankQuestionType,
@@ -183,18 +180,6 @@ export default function QuestionBankVaultPage() {
     setSubmittedSearch('');
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this question from the bank? This action cannot be undone.')) return;
-
-    try {
-      await deleteBankQuestion(id);
-      toast.success('Question deleted from vault');
-      await fetchQuestions({ silent: true });
-    } catch {
-      toast.error('Failed to delete question');
-    }
-  };
-
   const handleStartBuilding = () => {
     if (!gatewayCatId) {
       toast.error('Please select a target Category first.');
@@ -210,65 +195,6 @@ export default function QuestionBankVaultPage() {
     router.push(`/admin/question-bank/builder?${params.toString()}`);
   };
 
-  const getDifficultyBadge = (difficulty: QuestionDifficulty) => {
-    switch (difficulty) {
-      case 'EASY':
-        return (
-          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
-            EASY
-          </span>
-        );
-      case 'HARD':
-        return (
-          <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-xs font-bold text-red-700">
-            HARD
-          </span>
-        );
-      case 'MEDIUM':
-      default:
-        return (
-          <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
-            MEDIUM
-          </span>
-        );
-    }
-  };
-
-  const getTypeBadge = (type: BankQuestionType) => {
-    switch (type) {
-      case 'SINGLE_CHOICE':
-        return (
-          <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-bold text-indigo-700 border border-indigo-200/60">
-            Single Choice
-          </span>
-        );
-      case 'MULTIPLE_CHOICE':
-        return (
-          <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700 border border-purple-200/60">
-            Multiple Choice
-          </span>
-        );
-      case 'TRUE_FALSE':
-        return (
-          <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/60">
-            True / False
-          </span>
-        );
-      case 'SHORT_ANSWER':
-        return (
-          <span className="rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-bold text-teal-700 border border-teal-200/60">
-            Short Answer
-          </span>
-        );
-      default:
-        return (
-          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-700">
-            {type}
-          </span>
-        );
-    }
-  };
-
   const isFiltered = Boolean(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch);
 
   return (
@@ -280,10 +206,10 @@ export default function QuestionBankVaultPage() {
             Admin Console
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#191c1e] md:text-4xl">
-            Question Bank Vault
+            Question Bank Directory
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5b5a68]">
-            Master Repository — Store, filter, tag, and reuse multi-type assessment questions.
+            Master Repository Hub — Select a Category and Subject folder to view, edit, and maintain question vaults.
           </p>
         </div>
 
@@ -295,7 +221,7 @@ export default function QuestionBankVaultPage() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#dadce5] bg-white px-4 text-sm font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            Refresh Directory
           </button>
 
           <button
@@ -429,7 +355,7 @@ export default function QuestionBankVaultPage() {
           ) : filteredQuestions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[#cfd1dc] bg-white p-12 text-center shadow-xs">
               <Database className="mx-auto h-10 w-10 text-[#8d8b99]" />
-              <h3 className="mt-4 text-base font-bold text-[#191c1e]">No vault questions found</h3>
+              <h3 className="mt-4 text-base font-bold text-[#191c1e]">No vault folders found</h3>
               <p className="mt-1 text-xs leading-5 text-[#696778]">
                 {submittedSearch || selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty
                   ? 'No questions match your current filter settings. Try resetting filters.'
@@ -450,10 +376,10 @@ export default function QuestionBankVaultPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Filter Count & Clear */}
+              {/* Directory Filter Count Header */}
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-semibold text-[#696778]">
-                  Showing {filteredQuestions.length} question{filteredQuestions.length === 1 ? '' : 's'} across {Object.keys(groupedData).length} category group{Object.keys(groupedData).length === 1 ? '' : 's'}
+                  Directory: {filteredQuestions.length} total question{filteredQuestions.length === 1 ? '' : 's'} across {Object.keys(groupedData).length} category directory{Object.keys(groupedData).length === 1 ? '' : 's'}
                 </span>
                 {isFiltered ? (
                   <button
@@ -466,7 +392,7 @@ export default function QuestionBankVaultPage() {
                 ) : null}
               </div>
 
-              {/* Nested Accordion: Category Level 1 -> Subject Level 2 -> Question Cards Level 3 */}
+              {/* Directory List: Category Level 1 -> Subject Folder Cards Level 2 */}
               <div className="space-y-6">
                 {Object.entries(groupedData).map(([catName, subjectsMap]) => {
                   const totalCatQuestions = Object.values(subjectsMap).reduce(
@@ -474,13 +400,17 @@ export default function QuestionBankVaultPage() {
                     0
                   );
 
+                  // Look up category ID
+                  const matchingCat = taxonomy.find((c) => c.name === catName);
+                  const catId = matchingCat?.id || '';
+
                   return (
                     <details
                       key={catName}
                       open
                       className="group/cat rounded-2xl border border-[#e4e6ef] bg-white shadow-xs overflow-hidden transition"
                     >
-                      {/* Level 1 Header: Category Container */}
+                      {/* Level 1 Header: Category Row */}
                       <summary className="flex items-center justify-between p-4 cursor-pointer bg-[#f7f7fc] hover:bg-[#f0f1f8] border-b border-[#e4e6ef] transition select-none">
                         <div className="flex items-center gap-3">
                           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#3525cd]/10 text-[#3525cd]">
@@ -490,11 +420,11 @@ export default function QuestionBankVaultPage() {
                             <h2 className="text-base font-bold text-[#191c1e] flex items-center gap-2">
                               <span>{catName}</span>
                               <span className="rounded-full bg-[#3525cd] px-2.5 py-0.5 text-xs font-bold text-white">
-                                {totalCatQuestions}
+                                {totalCatQuestions} questions
                               </span>
                             </h2>
                             <p className="text-xs text-[#696778]">
-                              {Object.keys(subjectsMap).length} subject group{Object.keys(subjectsMap).length === 1 ? '' : 's'}
+                              {Object.keys(subjectsMap).length} subject folder{Object.keys(subjectsMap).length === 1 ? '' : 's'}
                             </p>
                           </div>
                         </div>
@@ -504,143 +434,64 @@ export default function QuestionBankVaultPage() {
                         </div>
                       </summary>
 
-                      {/* Level 2: Subject Containers */}
-                      <div className="p-4 space-y-4 bg-[#fbfbfd]">
-                        {Object.entries(subjectsMap).map(([subjName, qList]) => (
-                          <details
-                            key={subjName}
-                            open
-                            className="group/subj rounded-xl border border-[#eceef5] bg-white overflow-hidden shadow-2xs"
-                          >
-                            {/* Level 2 Sub-Header: Subject Container */}
-                            <summary className="flex items-center justify-between px-4 py-3 cursor-pointer bg-[#f8f9fc] hover:bg-[#f2f3fa] border-b border-[#eceef5] transition select-none">
-                              <div className="flex items-center gap-2.5">
-                                <BookOpen className="h-4 w-4 text-[#4f46e5]" />
-                                <h3 className="text-sm font-bold text-[#191c1e]">
-                                  {subjName}
-                                </h3>
-                                <span className="rounded-full bg-[#f1f0ff] px-2 py-0.5 text-xs font-bold text-[#3525cd] border border-[#3525cd]/20">
-                                  {qList.length}
-                                </span>
-                              </div>
+                      {/* Level 2: Subject Folder Cards Grid */}
+                      <div className="p-4 bg-[#fbfbfd]">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {Object.entries(subjectsMap).map(([subjName, qList]) => {
+                            const firstQuestion = qList[0];
+                            const actualCatId = catId || firstQuestion?.category_id || '';
+                            const actualSubjId =
+                              matchingCat?.subjects.find((s) => s.name === subjName)?.id ||
+                              firstQuestion?.subject_id ||
+                              '';
 
-                              <ChevronDown className="h-4 w-4 text-[#777586] transition-transform duration-200 group-open/subj:rotate-180" />
-                            </summary>
+                            const viewUrl = `/admin/question-bank/view?categoryId=${encodeURIComponent(
+                              actualCatId
+                            )}&subjectId=${encodeURIComponent(actualSubjId)}`;
 
-                            {/* Level 3: Actual Question Cards */}
-                            <div className="divide-y divide-[#eceef5]">
-                              {qList.map((q) => {
-                                const optionsList: { id: string; text: string }[] =
-                                  Array.isArray(q.content?.options)
-                                    ? q.content.options
-                                    : q.option_a
-                                    ? [
-                                        { id: 'A', text: q.option_a },
-                                        { id: 'B', text: q.option_b },
-                                        { id: 'C', text: q.option_c },
-                                        { id: 'D', text: q.option_d },
-                                      ]
-                                    : [];
-
-                                const correctVal = q.correct_answer?.value;
-                                const correctVals: string[] = Array.isArray(q.correct_answer?.values)
-                                  ? q.correct_answer.values
-                                  : correctVal
-                                  ? [String(correctVal)]
-                                  : q.correct_option
-                                  ? [q.correct_option]
-                                  : [];
-
-                                return (
-                                  <div key={q.id} className="p-5 transition hover:bg-[#fbfbfd]">
-                                    {/* Top row: Badges & Actions */}
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        {getTypeBadge(q.type)}
-                                        {getDifficultyBadge(q.difficulty)}
-                                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                                          {q.points || 1} pt{q.points === 1 ? '' : 's'}
-                                        </span>
+                            return (
+                              <div
+                                key={subjName}
+                                className="flex flex-col justify-between rounded-xl border border-[#eceef5] bg-white p-4 shadow-2xs transition hover:border-[#3525cd]/40 hover:shadow-md"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between border-b border-[#f0f1f8] pb-3">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                                        <Folder className="h-4 w-4" />
                                       </div>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDelete(q.id)}
-                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
-                                        title="Delete question"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
+                                      <h3 className="text-sm font-bold text-[#191c1e] truncate max-w-[170px]">
+                                        {subjName}
+                                      </h3>
                                     </div>
-
-                                    {/* Question Text */}
-                                    <h4 className="mt-3 text-sm font-bold leading-snug text-[#191c1e]">
-                                      {q.question_text}
-                                    </h4>
-
-                                    {/* Choices / Answers Preview */}
-                                    {q.type === 'SHORT_ANSWER' ? (
-                                      <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3 text-xs text-emerald-900 font-medium">
-                                        <span className="font-bold text-emerald-800">Accepted Answer: </span>
-                                        "{correctVal || 'N/A'}"
-                                      </div>
-                                    ) : optionsList.length > 0 ? (
-                                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
-                                        {optionsList.map((opt) => {
-                                          const isCorrect =
-                                            correctVals.includes(opt.id) ||
-                                            (q.correct_option && q.correct_option === opt.id);
-                                          return (
-                                            <div
-                                              key={opt.id}
-                                              className={`rounded-xl border p-2.5 ${
-                                                isCorrect
-                                                  ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900'
-                                                  : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'
-                                              }`}
-                                            >
-                                              <span className="font-bold text-[#3525cd]">{opt.id}: </span>
-                                              {opt.text}
-                                              {isCorrect ? (
-                                                <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" />
-                                              ) : null}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
-
-                                    {/* Explanation & Tags Footer */}
-                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#eceef5] pt-3 text-xs text-[#777586]">
-                                      {q.explanation ? (
-                                        <p className="line-clamp-1 italic text-[#696778]">
-                                          <span className="font-semibold not-italic text-[#191c1e]">Explanation:</span>{' '}
-                                          {q.explanation}
-                                        </p>
-                                      ) : (
-                                        <div />
-                                      )}
-
-                                      {q.tags && q.tags.length > 0 ? (
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <Tag className="h-3 w-3 text-[#3525cd]" />
-                                          {q.tags.map((tag, idx) => (
-                                            <span
-                                              key={idx}
-                                              className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60"
-                                            >
-                                              #{tag}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
+                                    <span className="rounded-full bg-[#f1f0ff] px-2.5 py-0.5 text-xs font-bold text-[#3525cd] border border-[#3525cd]/20">
+                                      {qList.length}
+                                    </span>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          </details>
-                        ))}
+
+                                  <p className="mt-3 text-xs text-[#696778] leading-relaxed">
+                                    Contains {qList.length} stored assessment question{qList.length === 1 ? '' : 's'}.
+                                  </p>
+                                </div>
+
+                                <div className="mt-4 pt-3 border-t border-[#f0f1f8] flex items-center justify-between">
+                                  <span className="text-[11px] font-semibold text-[#8d8b99]">
+                                    Vault Folder
+                                  </span>
+
+                                  {/* View Bank → Button Link */}
+                                  <Link
+                                    href={viewUrl}
+                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#3525cd] px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs transition hover:bg-[#2f20b8]"
+                                  >
+                                    <span>View Bank</span>
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                  </Link>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </details>
                   );
