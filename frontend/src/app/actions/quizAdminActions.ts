@@ -75,6 +75,7 @@ export async function createQuiz(quizData: QuizCreateInput) {
       duration_sec: Number(duration_sec) || 3600,
       is_published: Boolean(is_published),
       credit_cost: Number(credit_cost) || 0,
+      updated_at: new Date().toISOString(),
     };
 
     console.log("STEP 2: Data validated and ID generated. Preparing DB call with payload:", payload);
@@ -175,6 +176,7 @@ export async function saveFullQuiz(input: SaveFullQuizInput) {
       duration_sec: Number(input.durationSec) || 3600,
       credit_cost: Number(input.creditCost) || 0,
       is_published: Boolean(input.isPublished),
+      updated_at: new Date().toISOString(),
     };
 
     console.log("STEP 2: Data validated & Quiz ID generated:", quizId, "Preparing DB upsert payload:", quizPayload);
@@ -258,7 +260,7 @@ export async function publishQuiz(quizId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('quizzes')
-      .update({ is_published: true })
+      .update({ is_published: true, updated_at: new Date().toISOString() })
       .eq('id', quizId)
       .select();
 
