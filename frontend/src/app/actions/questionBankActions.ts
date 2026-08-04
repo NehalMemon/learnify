@@ -83,6 +83,53 @@ export async function createBankQuestion(input: CreateBankQuestionInput) {
   }
 }
 
+export async function bulkCreateBankQuestions(
+  questions: CreateBankQuestionInput[],
+  categoryId: string,
+  subjectId: string | null = null
+) {
+  try {
+    const supabase = await createClient();
+
+    const validSubjectId =
+      subjectId && typeof subjectId === 'string' && subjectId.trim().length > 0
+        ? subjectId.trim()
+        : null;
+
+    const mappedArray = questions.map((input) => ({
+      id: crypto.randomUUID(),
+      category_id: categoryId,
+      subject_id: validSubjectId,
+      type: input.type || 'SINGLE_CHOICE',
+      question_text: input.question_text.trim(),
+      points: Number(input.points) || 1,
+      explanation: input.explanation ? input.explanation.trim() : null,
+      difficulty: input.difficulty || 'MEDIUM',
+      tags: Array.isArray(input.tags) ? input.tags : [],
+      content: input.content ?? {},
+      correct_answer: input.correct_answer ?? {},
+    }));
+
+    console.log('bulkCreateBankQuestions inserting rows:', mappedArray.length);
+
+    const { data, error } = await supabase
+      .from('question_bank')
+      .insert(mappedArray)
+      .select('id');
+
+    if (error) {
+      console.error('DB Error (bulkCreateBankQuestions):', error);
+      throw new Error(error.message);
+    }
+
+    revalidatePath('/admin/question-bank');
+    return { success: true, count: mappedArray.length, data };
+  } catch (error) {
+    console.error('bulkCreateBankQuestions unexpected error:', error);
+    throw error instanceof Error ? error : new Error('Unexpected error while bulk inserting questions to vault');
+  }
+}
+
 export async function createBankQuestionsBatch(items: CreateBankQuestionInput[]) {
   try {
     const supabase = await createClient();

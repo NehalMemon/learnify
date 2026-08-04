@@ -19,6 +19,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
+  bulkCreateBankQuestions,
   createBankQuestionsBatch,
   type BankQuestionType,
   type CreateBankQuestionInput,
@@ -154,14 +155,19 @@ function MassEntryBuilderContent() {
   const handleSaveToVault = async () => {
     console.log('CLIENT: handleSaveToVault triggered with categoryId:', categoryId, 'subjectId:', subjectId);
 
-    // Validation
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      if (!q.question_text || !q.question_text.trim()) {
-        toast.error(`Question #${i + 1} prompt cannot be empty.`);
-        return;
-      }
+    // 1. Filter out empty 'ghost' rows (where question_text is blank)
+    const validQuestions = questions.filter(
+      (q) => q.question_text && q.question_text.trim().length > 0
+    );
 
+    if (validQuestions.length === 0) {
+      toast.error('Please enter at least one question prompt before saving.');
+      return;
+    }
+
+    // 2. Validate options on non-empty rows
+    for (let i = 0; i < validQuestions.length; i++) {
+      const q = validQuestions[i];
       if (q.type === 'SINGLE_CHOICE' || q.type === 'MULTIPLE_CHOICE') {
         if (!q.optionA.trim() || !q.optionB.trim()) {
           toast.error(`Question #${i + 1} must have at least Option A and Option B.`);
@@ -178,7 +184,7 @@ function MassEntryBuilderContent() {
     setIsSaving(true);
 
     try {
-      const payloadItems: CreateBankQuestionInput[] = questions.map((q) => {
+      const payloadItems: CreateBankQuestionInput[] = validQuestions.map((q) => {
         const tags = q.tagsInput
           ? q.tagsInput
               .split(',')
@@ -231,16 +237,16 @@ function MassEntryBuilderContent() {
         };
       });
 
-      console.log('CLIENT: Submitting batch items to vault:', payloadItems);
+      console.log('CLIENT: Invoking bulkCreateBankQuestions with items count:', payloadItems.length);
 
-      const res = await createBankQuestionsBatch(payloadItems);
+      const res = await bulkCreateBankQuestions(payloadItems, categoryId, subjectId || null);
 
       if (!res.success) {
-        toast.error(res.error || 'Failed to save questions to vault.');
+        toast.error('Failed to save questions to vault.');
         return;
       }
 
-      toast.success(`Successfully saved ${questions.length} question(s) to the Bank Vault!`);
+      toast.success(`Successfully added ${res.count} question(s) to the vault!`);
       setTimeout(() => router.push('/admin/question-bank'), 800);
     } catch (err: unknown) {
       console.error('CLIENT ERROR in handleSaveToVault:', err);
