@@ -263,13 +263,31 @@ export default function QuestionBankVaultPage() {
       </div>
 
       {/* Sidebar Filters & Content Layout */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+      <div className="flex flex-col md:flex-row items-start gap-6">
         {/* Left Sidebar Filter Panel */}
-        <div className="lg:col-span-1">
+        <div className="w-full md:w-72 lg:w-80 shrink-0">
           <div className="rounded-2xl border border-[#e4e6ef] bg-white p-5 shadow-xs">
-            <div className="flex items-center gap-2 border-b border-[#eceef5] pb-3 text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
-              <Filter className="h-4 w-4 text-[#3525cd]" />
-              <span>Vault Filters</span>
+            <div className="flex items-center justify-between border-b border-[#eceef5] pb-3">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#4b4a58]">
+                <Filter className="h-4 w-4 text-[#3525cd]" />
+                <span>Vault Filters</span>
+              </div>
+              {(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategoryId('');
+                    setSelectedSubjectId('');
+                    setSelectedType('');
+                    setSelectedDifficulty('');
+                    setSearchQuery('');
+                    setSubmittedSearch('');
+                  }}
+                  className="text-xs font-semibold text-[#3525cd] hover:underline"
+                >
+                  Reset
+                </button>
+              ) : null}
             </div>
 
             <form onSubmit={handleSearch} className="mt-4 space-y-4">
@@ -283,7 +301,10 @@ export default function QuestionBankVaultPage() {
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSubmittedSearch(e.target.value);
+                    }}
                     placeholder="Search prompt, choices, tags..."
                     className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] py-2 pl-9 pr-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
                   />
@@ -366,37 +387,12 @@ export default function QuestionBankVaultPage() {
                   <option value="HARD">HARD</option>
                 </select>
               </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 min-h-9 rounded-xl bg-[#3525cd] px-3 text-xs font-semibold text-white transition hover:bg-[#2f20b8]"
-                >
-                  Apply Filters
-                </button>
-                {(selectedCategoryId || selectedSubjectId || selectedType || selectedDifficulty || searchQuery || submittedSearch) ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedCategoryId('');
-                      setSelectedSubjectId('');
-                      setSelectedType('');
-                      setSelectedDifficulty('');
-                      setSearchQuery('');
-                      setSubmittedSearch('');
-                    }}
-                    className="rounded-xl border border-[#dadce5] bg-white px-3 text-xs font-semibold text-[#4b4a58] transition hover:bg-[#f7f7fb]"
-                  >
-                    Reset
-                  </button>
-                ) : null}
-              </div>
             </form>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="lg:col-span-3">
+        <div className="flex-1 w-full min-w-0">
           {isLoading ? (
             <div className="flex min-h-72 items-center justify-center rounded-2xl border border-[#e4e6ef] bg-white">
               <Spinner size="lg" />
