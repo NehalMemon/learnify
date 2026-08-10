@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/taxonomyActions";
 import { saveFullQuiz } from "@/app/actions/quizAdminActions";
 import { PublishQuizModal } from "@/components/admin/PublishQuizModal";
+import { GenerateWithAIModal } from "@/components/admin/GenerateWithAIModal";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -90,6 +91,29 @@ export default function CreateQuizPage() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+
+  const handleAIGenerate = (aiQuestions: any[]) => {
+    aiQuestions.forEach((q) => {
+      append({
+        type: (q.type as QuestionType) || "SINGLE_CHOICE",
+        questionText: q.question_text || q.questionText || "",
+        optionA: q.optionA || (q.content?.options?.[0]?.text) || "",
+        optionB: q.optionB || (q.content?.options?.[1]?.text) || "",
+        optionC: q.optionC || (q.content?.options?.[2]?.text) || "",
+        optionD: q.optionD || (q.content?.options?.[3]?.text) || "",
+        matchA: q.matchA || "",
+        matchB: q.matchB || "",
+        matchC: q.matchC || "",
+        matchD: q.matchD || "",
+        correctOption: q.correctOption || "A",
+        explanation: q.explanation || "",
+      });
+    });
+    if (activeIndex === null && aiQuestions.length > 0) {
+      setActiveIndex(0);
+    }
+  };
 
   /* ── React Hook Form ─────────────────────────────────────────── */
   const {
@@ -813,12 +837,13 @@ export default function CreateQuizPage() {
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
               AI Tools
             </h3>
-            <Link
-              href="/admin/quizzes/ai-generator"
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-3 rounded-lg hover:shadow-md transition-all font-medium text-sm"
+            <button
+              type="button"
+              onClick={() => setIsAIModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-3 rounded-lg hover:shadow-md transition-all font-medium text-sm cursor-pointer"
             >
               ✨ Generate with AI
-            </Link>
+            </button>
           </div>
 
           {/* Question type cards */}
@@ -863,6 +888,11 @@ export default function CreateQuizPage() {
           await handleSaveQuiz(true, durationMinutes, creditCost);
           setIsPublishModalOpen(false);
         }}
+      />
+      <GenerateWithAIModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onGenerate={handleAIGenerate}
       />
     </>
   );

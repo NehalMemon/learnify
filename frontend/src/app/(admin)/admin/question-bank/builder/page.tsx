@@ -14,8 +14,6 @@ import {
   Loader2,
   Plus,
   Save,
-  Sparkles,
-  Tag,
   Trash2,
 } from 'lucide-react';
 import {
@@ -37,7 +35,6 @@ interface QuestionDraftItem {
   points: number;
   difficulty: QuestionDifficulty;
   explanation: string;
-  tagsInput: string;
   optionA: string;
   optionB: string;
   optionC: string;
@@ -55,7 +52,6 @@ const createEmptyQuestion = (defaultDifficulty: QuestionDifficulty = 'MEDIUM'): 
   points: 1,
   difficulty: defaultDifficulty,
   explanation: '',
-  tagsInput: '',
   optionA: '',
   optionB: '',
   optionC: '',
@@ -71,9 +67,10 @@ function MassEntryBuilderContent() {
   const searchParams = useSearchParams();
 
   const categoryId = searchParams.get('categoryId') || '';
-  const subjectId = searchParams.get('subjectId') || '';
+  const initialSubjectId = searchParams.get('subjectId') || null;
 
   const [taxonomy, setTaxonomy] = useState<QuizCategoryWithSubjects[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId);
   const [globalDifficulty, setGlobalDifficulty] = useState<QuestionDifficulty>('MEDIUM');
   const [questions, setQuestions] = useState<QuestionDraftItem[]>([
     createEmptyQuestion('MEDIUM'),
@@ -86,6 +83,12 @@ function MassEntryBuilderContent() {
       .catch((err) => console.error('Failed to load taxonomy:', err));
   }, []);
 
+  const availableSubjects = useMemo(() => {
+    if (!categoryId) return [];
+    const cat = taxonomy.find((c) => c.id === categoryId);
+    return cat ? cat.subjects : [];
+  }, [taxonomy, categoryId]);
+
   const categoryName = useMemo(() => {
     if (!categoryId) return 'Uncategorized';
     const cat = taxonomy.find((c) => c.id === categoryId);
@@ -93,13 +96,10 @@ function MassEntryBuilderContent() {
   }, [taxonomy, categoryId]);
 
   const subjectName = useMemo(() => {
-    if (!subjectId) return null;
-    for (const cat of taxonomy) {
-      const subj = cat.subjects.find((s) => s.id === subjectId);
-      if (subj) return subj.name;
-    }
-    return 'Selected Subject';
-  }, [taxonomy, subjectId]);
+    if (!selectedSubjectId) return null;
+    const subj = availableSubjects.find((s) => s.id === selectedSubjectId);
+    return subj ? subj.name : 'Selected Subject';
+  }, [availableSubjects, selectedSubjectId]);
 
   const handleGlobalDifficultyChange = (newDiff: QuestionDifficulty) => {
     setGlobalDifficulty(newDiff);
@@ -167,7 +167,12 @@ function MassEntryBuilderContent() {
   };
 
   const handleSaveToVault = async () => {
-    console.log('CLIENT: handleSaveToVault triggered with categoryId:', categoryId, 'subjectId:', subjectId);
+    console.log('CLIENT: handleSaveToVault triggered with categoryId:', categoryId, 'selectedSubjectId:', selectedSubjectId);
+
+    if (!selectedSubjectId) {
+      toast.error('Please select a Subject before saving questions to the vault.');
+      return;
+    }
 
     // 1. Filter out empty 'ghost' rows (where question_text is blank)
     const validQuestions = questions.filter(
@@ -199,13 +204,6 @@ function MassEntryBuilderContent() {
 
     try {
       const payloadItems: CreateBankQuestionInput[] = validQuestions.map((q) => {
-        const tags = q.tagsInput
-          ? q.tagsInput
-              .split(',')
-              .map((t) => t.trim().replace(/^#/, ''))
-              .filter(Boolean)
-          : [];
-
         let content: Record<string, any> = {};
         let correct_answer: Record<string, any> = {};
 
@@ -239,13 +237,13 @@ function MassEntryBuilderContent() {
 
         return {
           category_id: categoryId || null,
-          subject_id: subjectId || null,
+          subject_id: selectedSubjectId,
           type: q.type,
           question_text: q.question_text.trim(),
           points: Number(q.points) || 1,
           explanation: q.explanation ? q.explanation.trim() : null,
           difficulty: q.difficulty,
-          tags,
+          tags: [],
           content,
           correct_answer,
         };
@@ -253,7 +251,7 @@ function MassEntryBuilderContent() {
 
       console.log('CLIENT: Invoking bulkCreateBankQuestions with items count:', payloadItems.length);
 
-      const res = await bulkCreateBankQuestions(payloadItems, categoryId, subjectId || null);
+      const res = await bulkCreateBankQuestions(payloadItems, categoryId, selectedSubjectId);
 
       if (!res.success) {
         toast.error('Failed to save questions to vault.');
@@ -275,8 +273,9 @@ function MassEntryBuilderContent() {
     <div className="min-h-screen bg-[#f8f9fc] font-sans text-[#191c1e] antialiased pb-24">
       {/* Sticky Top Header / Settings Bar */}
       <div className="sticky top-0 z-30 border-b border-[#e4e6ef] bg-white/95 backdrop-blur-md shadow-xs">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 w-full max-w-6xl px-6 py-4">
+          {/* Header Left: Navigation & Title */}
+          <div className="flex items-center gap-4 shrink-0">
             <Link
               href="/admin/question-bank"
               className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#dadce5] text-[#4b4a58] transition hover:bg-[#f7f7fb]"
@@ -285,7 +284,7 @@ function MassEntryBuilderContent() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-lg font-bold text-[#191c1e]">Mass Question Builder</h1>
                 <span className="rounded-full bg-[#f1f0ff] px-2.5 py-0.5 text-xs font-bold text-[#3525cd]">
                   {categoryName}
@@ -302,29 +301,52 @@ function MassEntryBuilderContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Global Default Difficulty Dropdown */}
-            <div className="flex items-center gap-2 border-r border-[#eceef5] pr-4">
-              <label className="text-xs font-bold uppercase tracking-wider text-[#696778]">
-                Default Difficulty:
-              </label>
-              <select
-                value={globalDifficulty}
-                onChange={(e) => handleGlobalDifficultyChange(e.target.value as QuestionDifficulty)}
-                className="min-h-9 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs font-bold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-              >
-                <option value="EASY">EASY</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HARD">HARD</option>
-              </select>
+          {/* Header Right: Controls & Save Button */}
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between xl:justify-end gap-4 w-full xl:w-auto">
+            <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
+              {/* Global Subject Select Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#696778] shrink-0">
+                  Subject <span className="text-red-500">*</span>:
+                </label>
+                <select
+                  value={selectedSubjectId || ''}
+                  onChange={(e) => setSelectedSubjectId(e.target.value || null)}
+                  className="min-h-9 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs font-bold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                >
+                  <option value="">-- Select Subject --</option>
+                  {availableSubjects.map((subj) => (
+                    <option key={subj.id} value={subj.id}>
+                      {subj.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Global Default Difficulty Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-[#696778] shrink-0">
+                  Default Difficulty:
+                </label>
+                <select
+                  value={globalDifficulty}
+                  onChange={(e) => handleGlobalDifficultyChange(e.target.value as QuestionDifficulty)}
+                  className="min-h-9 rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs font-bold text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+                >
+                  <option value="EASY">EASY</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HARD">HARD</option>
+                </select>
+              </div>
             </div>
 
             {/* Main Save to Vault Button */}
             <button
               type="button"
               onClick={handleSaveToVault}
-              disabled={isSaving}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-5 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8] disabled:opacity-60"
+              disabled={isSaving || !selectedSubjectId}
+              title={!selectedSubjectId ? 'Please select a Subject before saving' : 'Save questions to vault'}
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-5 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8] disabled:opacity-50 disabled:cursor-not-allowed shrink-0 w-full sm:w-auto"
             >
               {isSaving ? (
                 <>
@@ -554,43 +576,28 @@ function MassEntryBuilderContent() {
               )}
             </div>
 
-            {/* Footer Details: Explanation & Tags */}
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778] mb-1">
-                  Explanation / Rationale
-                </label>
-                <input
-                  type="text"
-                  value={q.explanation}
-                  onChange={(e) => handleQuestionChange(idx, 'explanation', e.target.value)}
-                  placeholder="Optional answer explanation..."
-                  className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-[#696778] mb-1">
-                  Tags (Comma separated)
-                </label>
-                <input
-                  type="text"
-                  value={q.tagsInput}
-                  onChange={(e) => handleQuestionChange(idx, 'tagsInput', e.target.value)}
-                  placeholder="cardiology, step1, highyield..."
-                  className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
-                />
-              </div>
+            {/* Footer Details: Explanation */}
+            <div className="mt-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#696778] mb-1">
+                Explanation / Rationale
+              </label>
+              <input
+                type="text"
+                value={q.explanation}
+                onChange={(e) => handleQuestionChange(idx, 'explanation', e.target.value)}
+                placeholder="Optional answer explanation..."
+                className="min-h-10 w-full rounded-xl border border-[#dadce5] bg-[#f7f7fb] px-3 text-xs text-[#191c1e] outline-none transition focus:border-[#3525cd] focus:bg-white"
+              />
             </div>
           </div>
         ))}
 
-        {/* Bottom Add Another Question Button */}
-        <div className="pt-2 text-center">
+        {/* Bottom Action Bar */}
+        <div className="pt-2 flex justify-center w-full">
           <button
             type="button"
             onClick={handleAddQuestion}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#3525cd]/40 bg-[#f1f0ff]/50 px-6 text-sm font-bold text-[#3525cd] transition hover:border-[#3525cd] hover:bg-[#f1f0ff]"
+            className="inline-flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#3525cd]/40 bg-[#f1f0ff]/50 px-6 text-sm font-bold text-[#3525cd] transition hover:border-[#3525cd] hover:bg-[#f1f0ff] shadow-2xs"
           >
             <Plus className="h-5 w-5" />
             + Add Another Question

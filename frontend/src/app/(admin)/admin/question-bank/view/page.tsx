@@ -9,6 +9,7 @@ import {
   BookOpen,
   CheckCircle2,
   Database,
+  FileSpreadsheet,
   Filter,
   Layers,
   Plus,
@@ -30,6 +31,7 @@ import {
   type QuizCategoryWithSubjects,
 } from '@/app/actions/taxonomyActions';
 import { Spinner } from '@/components/ui/Spinner';
+import { ImportQuestionsModal } from '@/components/admin/ImportQuestionsModal';
 
 function getRelationName(relation?: { name?: string | null } | { name?: string | null }[] | null): string {
   if (!relation) return '';
@@ -49,6 +51,7 @@ function QuestionBankViewerContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Local Filters State
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId);
@@ -280,6 +283,15 @@ function QuestionBankViewerContent() {
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             Refresh Vault
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#3525cd] bg-[#f1f0ff] px-4 text-xs font-semibold text-[#3525cd] transition hover:bg-[#e4e1ff]"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            Import CSV
           </button>
 
           <Link
@@ -543,6 +555,14 @@ function QuestionBankViewerContent() {
           </div>
         )}
       </div>
+
+      <ImportQuestionsModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        categoryId={categoryId}
+        subjectId={selectedSubjectId || initialSubjectId || null}
+        onSuccess={() => fetchQuestions({ silent: true })}
+      />
     </div>
   );
 }
