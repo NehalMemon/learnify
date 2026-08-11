@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import apiClient from "@/lib/api";
 import { toast } from "react-hot-toast";
+import { ArrowLeft, Plus, Database } from "lucide-react";
+import { AddFromBankModal } from "@/components/admin/AddFromBankModal";
 import { getCategoriesWithSubjects } from "@/app/actions/taxonomyActions";
 import { getQuizById, saveFullQuiz } from "@/app/actions/quizAdminActions";
 import {
@@ -368,6 +370,13 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
+
+  const handleBankImport = (importedQuestions: any[]) => {
+    if (!importedQuestions || importedQuestions.length === 0) return;
+    setQuestions((prev) => [...prev, ...importedQuestions]);
+    toast.success(`Imported ${importedQuestions.length} question${importedQuestions.length === 1 ? "" : "s"} from the vault!`);
+  };
 
   // ── Fetch data on mount ────────────────────────────────────────
   useEffect(() => {
@@ -569,7 +578,7 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
             onClick={() => router.back()}
             className="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-900"
           >
-            ← Back
+            <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900">Edit Quiz</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -698,14 +707,26 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
               ))}
             </div>
 
-            <button
-              type="button"
-              onClick={handleAddQuestion}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 transition hover:border-purple-400 hover:bg-gray-50 hover:text-gray-900"
-            >
-              <span className="text-lg leading-none">+</span>
-              Add Another Question
-            </button>
+            <div className="mt-4 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAddQuestion}
+                className="flex-1 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 transition hover:border-purple-400 hover:bg-gray-50 hover:text-gray-900"
+              >
+                <Plus className="h-4 w-4" />
+                Add Another Question
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBankModalOpen(true)}
+                disabled={!categoryId}
+                title={!categoryId ? "Select a Category first" : "Import questions from category vault"}
+                className="flex-1 flex w-full items-center justify-center gap-2 rounded-xl border border-purple-200 bg-purple-50 py-3 text-sm font-semibold text-purple-700 transition hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Database className="h-4 w-4" />
+                Add from Bank
+              </button>
+            </div>
           </section>
 
           {/* Status messages */}
@@ -746,6 +767,14 @@ export default function EditQuizPage({ params }: { params: Promise<{ quizId: str
           </div>
         </form>
       </div>
+
+      <AddFromBankModal
+        isOpen={isBankModalOpen}
+        onClose={() => setIsBankModalOpen(false)}
+        categoryId={categoryId || ""}
+        subjectId={subject}
+        onImport={handleBankImport}
+      />
     </div>
   );
 }

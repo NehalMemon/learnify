@@ -8,6 +8,8 @@ import {
   BookOpen,
   Database,
   Users,
+  Briefcase,
+  UserCheck,
   Settings,
   Coins,
   School,
@@ -18,12 +20,14 @@ import { SidebarShell, NavItem } from '@/components/layout/SidebarShell';
 
 const adminNavItems: NavItem[] = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/users', label: 'User Management', icon: Users },
+  { href: '/admin/instructors', label: 'Instructor Management', icon: Briefcase },
+  { href: '/admin/students', label: 'Student Management', icon: UserCheck },
   { href: '/admin/requests', label: 'Credit Requests', icon: Coins },
   { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree },
   { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
   { href: '/admin/quizzes/library', label: 'Quiz Library', icon: BookOpen },
   { href: '/admin/question-bank', label: 'Question Bank', icon: Database },
-  { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 

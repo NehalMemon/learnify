@@ -8,7 +8,7 @@ export * from './types_db';
 
 // ─── User & Auth ───────────────────────────────────────────────
 
-export type UserRole = 'STUDENT' | 'ADMIN';
+export type UserRole = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
 
 export interface User {

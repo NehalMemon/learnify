@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:cron": "node scripts/dev-cron.mjs",
     "build": "next build",
     "build:bones": "boneyard-js build",
     "start": "next start",
@@ -49,6 +50,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.14",
+    "node-cron": "^4.6.0",
     "tailwindcss": "^4",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.9.3"
