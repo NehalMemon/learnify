@@ -600,7 +600,7 @@ function MassEntryBuilderContent() {
             className="inline-flex min-h-12 w-full max-w-md items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#3525cd]/40 bg-[#f1f0ff]/50 px-6 text-sm font-bold text-[#3525cd] transition hover:border-[#3525cd] hover:bg-[#f1f0ff] shadow-2xs"
           >
             <Plus className="h-5 w-5" />
-            + Add Another Question
+            Add Another Question
           </button>
         </div>
       </div>

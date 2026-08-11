@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, UserCog, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, UserCog, ChevronLeft, ChevronRight, Briefcase, CheckCircle2, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Spinner } from '@/components/ui/Spinner';
 import { createClient } from '@/utils/supabase/client';
@@ -45,7 +45,7 @@ const statusClasses: Record<UserStatus, string> = {
   PENDING: 'bg-amber-50 text-amber-700 border border-amber-200',
 };
 
-export default function AdminUsersPage() {
+export default function AdminInstructorsPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,9 +53,10 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [activeCount, setActiveCount] = useState(0);
+  const [inactiveCount, setInactiveCount] = useState(0);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
 
   // Debounce search input
@@ -67,20 +68,28 @@ export default function AdminUsersPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchInstructors = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       const supabase = createClient();
 
+      // Fetch stats for instructors
+      const { data: statsData } = await supabase
+        .from('users')
+        .select('status')
+        .eq('role', 'INSTRUCTOR');
+
+      if (statsData) {
+        setActiveCount(statsData.filter((u) => u.status === 'ACTIVE').length);
+        setInactiveCount(statsData.filter((u) => u.status === 'INACTIVE').length);
+      }
+
       let query = supabase
         .from('users')
         .select('id, email, full_name, role, status, credits, created_at', { count: 'exact' })
+        .eq('role', 'INSTRUCTOR')
         .order('created_at', { ascending: false });
-
-      if (roleFilter !== 'ALL') {
-        query = query.eq('role', roleFilter);
-      }
 
       if (searchQuery) {
         query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
@@ -94,16 +103,16 @@ export default function AdminUsersPage() {
 
       if (fetchErr) {
         console.error('Supabase fetch error:', fetchErr);
-        setError(`Failed to load users: ${fetchErr.message}`);
+        setError(`Failed to load instructors: ${fetchErr.message}`);
         setUsers([]);
         return;
       }
 
       const userList: UserRow[] = (data || []).map((u: ApiUser) => ({
         id: u.id,
-        fullName: u.full_name || u.fullName || u.email?.split('@')[0] || 'User',
+        fullName: u.full_name || u.fullName || u.email?.split('@')[0] || 'Instructor',
         email: u.email,
-        role: (u.role as UserRole) || 'STUDENT',
+        role: (u.role as UserRole) || 'INSTRUCTOR',
         status: (u.status as UserStatus) || 'ACTIVE',
         credits: u.credits ?? 0,
         createdAt: u.created_at || u.createdAt || new Date().toISOString(),
@@ -115,16 +124,16 @@ export default function AdminUsersPage() {
       setTotalPages(Math.max(1, Math.ceil(total / PAGE_SIZE)));
     } catch (err) {
       console.error('Supabase fetch error:', err);
-      setError('Failed to load users. Please retry.');
+      setError('Failed to load instructors. Please retry.');
       setUsers([]);
     } finally {
       setIsLoading(false);
     }
-  }, [page, searchQuery, roleFilter]);
+  }, [page, searchQuery]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchInstructors();
+  }, [fetchInstructors]);
 
   // Handle direct inline role change
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
@@ -135,10 +144,10 @@ export default function AdminUsersPage() {
     const res = await updateUserRole(userId, newRole);
     if (res.success) {
       toast.success('User role updated successfully');
-      fetchUsers();
+      fetchInstructors();
     } else {
       toast.error(res.error || 'Failed to update user role');
-      fetchUsers();
+      fetchInstructors();
     }
   };
 
@@ -150,10 +159,11 @@ export default function AdminUsersPage() {
 
     const res = await updateUserStatus(userId, newStatus);
     if (res.success) {
-      toast.success(`User status updated to ${newStatus}`);
+      toast.success(`Instructor status updated to ${newStatus}`);
+      fetchInstructors();
     } else {
-      toast.error(res.error || 'Failed to update user status');
-      fetchUsers();
+      toast.error(res.error || 'Failed to update instructor status');
+      fetchInstructors();
     }
   };
 
@@ -170,15 +180,15 @@ export default function AdminUsersPage() {
       ]);
 
       if (statusRes.success && roleRes.success) {
-        toast.success('User role and status updated successfully');
+        toast.success('Instructor updated successfully');
         setSelectedUser(null);
-        fetchUsers();
+        fetchInstructors();
       } else {
-        toast.error(statusRes.error || roleRes.error || 'Failed to update user');
+        toast.error(statusRes.error || roleRes.error || 'Failed to update instructor');
       }
     } catch (err) {
       console.error('handleSaveModalChanges error:', err);
-      toast.error('Failed to update user');
+      toast.error('Failed to update instructor');
     } finally {
       setIsSaving(false);
     }
@@ -195,12 +205,12 @@ export default function AdminUsersPage() {
       const { error: delErr } = await supabase.from('users').delete().eq('id', userId);
       if (delErr) throw delErr;
 
-      toast.success('User account permanently deleted');
+      toast.success('Instructor account permanently deleted');
       setSelectedUser(null);
-      fetchUsers();
+      fetchInstructors();
     } catch (err) {
       console.error('handleDeleteUser error:', err);
-      toast.error('Failed to delete user');
+      toast.error('Failed to delete instructor account');
     } finally {
       setIsSaving(false);
     }
@@ -211,44 +221,65 @@ export default function AdminUsersPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="page-title">User Governance & Access</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage overall user accounts, roles (Admin, Instructor, Student), status, and access.
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
+            Instructor Management
+          </h1>
+          <p className="mt-1 text-xs text-gray-500">
+            Audit, manage, and update instructor permissions across the LMS.
           </p>
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-purple-100 bg-purple-50/50 p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white">
+              <Briefcase className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-purple-700">Total Instructors</p>
+              <h3 className="text-xl font-bold text-gray-900">{totalCount}</h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Active Instructors</p>
+              <h3 className="text-xl font-bold text-gray-900">{activeCount}</h3>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-600 text-white">
+              <XCircle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-rose-700">Inactive Instructors</p>
+              <h3 className="text-xl font-bold text-gray-900">{inactiveCount}</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search user name or email..."
+            placeholder="Search instructor name or email..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 shadow-sm focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
           />
-        </div>
-
-        {/* Role Filter Selector */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Filter Role:
-          </label>
-          <select
-            value={roleFilter}
-            onChange={(e) => {
-              setRoleFilter(e.target.value as 'ALL' | UserRole);
-              setPage(1);
-            }}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700 shadow-sm outline-none focus:border-purple-500"
-          >
-            <option value="ALL">All Roles</option>
-            <option value="ADMIN">ADMIN</option>
-            <option value="INSTRUCTOR">INSTRUCTOR</option>
-            <option value="STUDENT">STUDENT</option>
-          </select>
         </div>
       </div>
 
@@ -262,7 +293,7 @@ export default function AdminUsersPage() {
           <div className="p-8 text-center text-sm text-red-600 space-y-2">
             <p className="font-semibold">{error}</p>
             <button
-              onClick={fetchUsers}
+              onClick={fetchInstructors}
               className="rounded-lg bg-purple-50 border border-purple-200 px-4 py-2 text-xs font-bold text-purple-700 hover:bg-purple-100"
             >
               Retry Fetch
@@ -270,16 +301,15 @@ export default function AdminUsersPage() {
           </div>
         ) : users.length === 0 ? (
           <div className="p-12 text-center text-sm text-gray-500">
-            No users found matching your search and filter criteria.
+            No instructors found matching your search.
           </div>
         ) : (
           <table className="w-full text-sm text-left">
             <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
               <tr>
-                <th className="px-4 py-3">User</th>
+                <th className="px-4 py-3">Instructor</th>
                 <th className="px-4 py-3">Role Governance</th>
                 <th className="px-4 py-3">Status Governance</th>
-                <th className="px-4 py-3">Credits Balance</th>
                 <th className="px-4 py-3">Joined Date</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -316,10 +346,6 @@ export default function AdminUsersPage() {
                     </select>
                   </td>
 
-                  <td className="px-4 py-4 font-black text-purple-700">
-                    {user.credits.toLocaleString()} Credits
-                  </td>
-
                   <td className="px-4 py-4 text-xs text-gray-600">
                     {new Date(user.createdAt).toLocaleDateString('en-GB', {
                       day: '2-digit',
@@ -348,7 +374,7 @@ export default function AdminUsersPage() {
       {/* Pagination Footer */}
       <div className="flex flex-col gap-3 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs font-medium">
-          Showing {users.length} of {totalCount} total users (Page {page} of {totalPages})
+          Showing {users.length} of {totalCount} total instructors (Page {page} of {totalPages})
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -383,4 +409,3 @@ export default function AdminUsersPage() {
     </div>
   );
 }
-

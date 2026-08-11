@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ShieldCheck, UserCog, UserMinus, X } from 'lucide-react';
-
-type UserRole = 'STUDENT' | 'ADMIN';
-type UserStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
+import { UserRole, UserStatus } from '@/types';
 
 export type ManagedUser = {
   id: string;
@@ -30,7 +28,7 @@ type ManageUserModalProps = {
   onDeleteAccount: (userId: string) => Promise<void>;
 };
 
-const ROLE_OPTIONS: UserRole[] = ['STUDENT', 'ADMIN'];
+const ROLE_OPTIONS: UserRole[] = ['STUDENT', 'INSTRUCTOR', 'ADMIN'];
 const STATUS_OPTIONS: UserStatus[] = ['ACTIVE', 'INACTIVE', 'PENDING'];
 
 export function ManageUserModal({

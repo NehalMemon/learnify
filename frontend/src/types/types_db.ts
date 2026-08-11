@@ -11,7 +11,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type UserRole = 'STUDENT' | 'ADMIN';
+export type UserRole = 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
 export type CreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type LogLevel = 'INFO' | 'WARN' | 'ERROR';
