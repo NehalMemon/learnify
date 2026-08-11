@@ -43,6 +43,15 @@ export interface LiveClass {
   updated_at: string;
 }
 
+/**
+ * Live class enriched with joined display fields (course title + teacher
+ * name) for the admin Class Library dashboard.
+ */
+export interface LiveClassRow extends LiveClass {
+  course_title: string | null;
+  teacher_name: string | null;
+}
+
 // ─── Payloads ──────────────────────────────────────────────────
 
 export interface CreateLiveClassPayload {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Calendar, Check, Clock, Loader2, User, Users } from 'lucide-react';
+import { BookOpen, Calendar, Check, Clock, Loader2, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createLiveClass } from '@/actions/live-class';
 import type { CreateLiveClassPayload } from '@/types/live-class';
@@ -9,7 +9,8 @@ import type { CreateLiveClassPayload } from '@/types/live-class';
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
 export interface CreateClassFormProps {
-  courseId: string;
+  /** All courses the admin can schedule a class against (id + title for the dropdown) */
+  courses: { id: string; title: string }[];
   availableTeachers: { id: string; name: string }[];
   availableStudents: { id: string; name: string }[];
   /** Called after a successful create so the parent can close the modal / refresh. */
@@ -17,6 +18,7 @@ export interface CreateClassFormProps {
 }
 
 interface FormState {
+  courseId: string;
   title: string;
   description: string;
   /** Raw `<input type="datetime-local">` value, e.g. "2026-08-10T14:30". */
@@ -27,6 +29,7 @@ interface FormState {
 }
 
 interface FieldErrors {
+  courseId?: string;
   title?: string;
   teacherId?: string;
   startTime?: string;
@@ -34,6 +37,7 @@ interface FieldErrors {
 }
 
 const EMPTY_FORM: FormState = {
+  courseId: '',
   title: '',
   description: '',
   startTime: '',
@@ -62,7 +66,7 @@ const scrollbarHide = '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
 /* ── Component ─────────────────────────────────────────────────────────── */
 
 export function CreateClassForm({
-  courseId,
+  courses,
   availableTeachers,
   availableStudents,
   onSuccess,
@@ -110,6 +114,7 @@ export function CreateClassForm({
 
   const validate = (): FieldErrors => {
     const next: FieldErrors = {};
+    if (!form.courseId) next.courseId = 'Please select a course.';
     if (!form.title.trim()) next.title = 'Class title is required.';
     if (!form.teacherId) next.teacherId = 'Please assign a teacher.';
     if (!form.startTime) next.startTime = 'Start time is required.';
@@ -139,7 +144,7 @@ export function CreateClassForm({
     // the server action interprets them in the server's local timezone and
     // normalizes to UTC before persisting.
     const payload: CreateLiveClassPayload = {
-      course_id: courseId,
+      course_id: form.courseId,
       title: form.title.trim(),
       description: form.description.trim() || undefined,
       teacher_id: form.teacherId,
@@ -157,7 +162,13 @@ export function CreateClassForm({
         toast.error(result.error || 'Failed to schedule the live class. Please try again.');
         return;
       }
-      toast.success('Live class scheduled successfully!');
+      // Surface the teacher-Google-connection warning (if any) so the admin
+      // knows the Meet meeting won't be created on the teacher's calendar yet.
+      if ('warning' in result && result.warning) {
+        toast(result.warning, { icon: '⚠️', duration: 6000 });
+      } else {
+        toast.success('Live class scheduled successfully!');
+      }
       setForm(EMPTY_FORM);
       setErrors({});
       onSuccess?.();
@@ -171,6 +182,49 @@ export function CreateClassForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
+      {/* ── Course ────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Course</h3>
+            <p className="text-xs text-gray-500">Which course this session belongs to</p>
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="cc-course" className="mb-1 block text-sm font-medium text-gray-700">
+            Associated Course <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="cc-course"
+            name="courseId"
+            value={form.courseId}
+            onChange={handleChange}
+            disabled={isSubmitting || courses.length === 0}
+            className={`${inputBase} ${errors.courseId ? inputError : inputOk}`}
+            aria-invalid={Boolean(errors.courseId)}
+            aria-describedby={errors.courseId ? 'cc-course-err' : undefined}
+          >
+            <option value="">
+              {courses.length === 0 ? 'No courses available' : '— Select course —'}
+            </option>
+            {courses.map((course) => (
+              <option key={course.id} value={course.id}>
+                {course.title}
+              </option>
+            ))}
+          </select>
+          {errors.courseId && (
+            <p id="cc-course-err" role="alert" className="mt-1 text-xs text-red-600">
+              {errors.courseId}
+            </p>
+          )}
+        </div>
+      </section>
+
       {/* ── Class Details ─────────────────────────────────────── */}
       <section className="space-y-4">
         <div className="flex items-center gap-2.5">

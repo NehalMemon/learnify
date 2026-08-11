@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, UserCog, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, UserCog, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Spinner } from '@/components/ui/Spinner';
 import { createClient } from '@/utils/supabase/client';
 import { updateUserStatus, updateUserRole } from '@/app/actions/userAdminActions';
 import { ManageUserModal, type ManagedUser } from '@/components/admin/users/ManageUserModal';
+import { RoleChangeModal } from '@/components/admin/users/RoleChangeModal';
 import { UserRole, UserStatus } from '@/types';
 
 interface UserRow {
@@ -57,6 +58,7 @@ export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<'ALL' | UserRole>('ALL');
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [roleModalUser, setRoleModalUser] = useState<UserRow | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -126,21 +128,6 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Handle direct inline role change
-  const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
-
-    const res = await updateUserRole(userId, newRole);
-    if (res.success) {
-      toast.success('User role updated successfully');
-      fetchUsers();
-    } else {
-      toast.error(res.error || 'Failed to update user role');
-      fetchUsers();
-    }
-  };
 
   // Handle direct inline status change
   const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
@@ -293,15 +280,22 @@ export default function AdminUsersPage() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <select
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                      className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold border cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500 ${roleClasses[user.role]}`}
-                    >
-                      <option value="ADMIN">ADMIN</option>
-                      <option value="INSTRUCTOR">INSTRUCTOR</option>
-                      <option value="STUDENT">STUDENT</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center rounded-xl px-2.5 py-1 text-xs font-bold ${roleClasses[user.role]}`}
+                      >
+                        {user.role}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRoleModalUser(user)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-gray-600 shadow-sm transition hover:bg-purple-50 hover:text-purple-700 hover:border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                        title="Change Role"
+                      >
+                        <Pencil size={13} />
+                        <span>Change Role</span>
+                      </button>
+                    </div>
                   </td>
 
                   <td className="px-4 py-4">
@@ -379,6 +373,14 @@ export default function AdminUsersPage() {
         onSaveChanges={handleSaveModalChanges}
         onResetPassword={handleResetPassword}
         onDeleteAccount={handleDeleteUser}
+      />
+
+      {/* Role Change Modal */}
+      <RoleChangeModal
+        isOpen={Boolean(roleModalUser)}
+        user={roleModalUser}
+        onClose={() => setRoleModalUser(null)}
+        onSuccess={fetchUsers}
       />
     </div>
   );

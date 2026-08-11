@@ -3,14 +3,21 @@
  *
  * Server-side Google Calendar API v3 client built on native `fetch`.
  * Deliberately avoids the `googleapis` npm package to keep the server
- * bundle small. Authentication uses the OAuth 2.0 refresh-token flow
- * with long-lived credentials from `.env`:
+ * bundle small.
  *
- *   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN
+ * Authentication uses the OAuth 2.0 refresh-token flow. Meetings are
+ * created on the *assigned teacher's* calendar (giving them full host
+ * authority), so each call exchanges that teacher's personal refresh
+ * token — stored on `public.users.google_refresh_token` — for a fresh
+ * access token. The global client credentials (`GOOGLE_CLIENT_ID` /
+ * `GOOGLE_CLIENT_SECRET`) still come from `.env`, and the legacy
+ * system-wide `GOOGLE_REFRESH_TOKEN` remains available as a fallback
+ * for teachers who haven't connected their own account yet.
  *
  * SERVER-ONLY BY CONTRACT: this module must never be imported from a
  * Client Component. It is consumed exclusively by Server Actions
- * (`actions/live-class.ts`).
+ * (`actions/live-class.ts`) and the cron route
+ * (`app/api/cron/live-classes/route.ts`).
  */
 
 // ─── Endpoints ─────────────────────────────────────────────────
@@ -28,7 +35,14 @@ export interface CreateMeetParams {
   startTime: string;
   /** ISO string */
   endTime: string;
+  /** Invitees (enrolled students + the teacher) — whitelisted to bypass the Meet waiting room */
   attendeeEmails: string[];
+  /**
+   * OAuth refresh token of the calendar owner — the assigned teacher's
+   * personal token from `public.users.google_refresh_token`. The event
+   * is created on this account's calendar, making the teacher the Meet host.
+   */
+  teacherRefreshToken: string;
 }
 
 export interface GoogleMeetEventResult {
@@ -88,44 +102,48 @@ async function readErrorDetail(response: Response): Promise<string> {
 }
 
 // ─── Token Cache ─────────────────────────────────────────────────
-// Google access tokens are valid for ~1 hour. Cache them module-wide
-// with a conservative TTL so bulk operations (e.g. creating many live
-// classes at once) exchange the refresh token once per burst instead
-// of once per event.
+// Google access tokens are valid for ~1 hour. Cache them keyed by the
+// refresh token they were minted from (a teacher's personal token, or
+// the system-wide `.env` token) with a conservative TTL, so a cron run
+// that processes several classes for the same teacher exchanges that
+// teacher's refresh token once per burst instead of once per event —
+// and access tokens minted for different teachers never collide.
 
 const ACCESS_TOKEN_TTL_MS = 50 * 60 * 1000; // 50 minutes
 
-let cachedAccessToken: string | null = null;
-let cachedAccessTokenExpiresAt = 0;
+const accessTokenCache = new Map<
+  string,
+  { token: string; expiresAt: number }
+>();
 
 // ─── Auth ──────────────────────────────────────────────────────
 
 /**
- * Silently exchanges the OAuth 2.0 refresh token for a fresh access token.
+ * Core OAuth 2.0 refresh-token grant shared by all token helpers.
+ * Exchanges a refresh token for a short-lived access token using the
+ * global `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` from `.env`.
  *
- * @returns A valid `access_token` string
- * @throws  If credentials are missing from `.env` or Google rejects the grant
+ * Results are cached per refresh token (see Token Cache above).
  */
-export async function getAccessToken(): Promise<string> {
-  // Fast path: reuse a still-valid cached token.
-  if (cachedAccessToken && Date.now() < cachedAccessTokenExpiresAt) {
-    return cachedAccessToken;
+async function exchangeRefreshToken(refreshToken: string): Promise<string> {
+  // Fast path: reuse a still-valid cached token minted from this refresh token.
+  const cached = accessTokenCache.get(refreshToken);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.token;
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
-  if (!clientId || !clientSecret || !refreshToken) {
+  if (!clientId || !clientSecret) {
     const missing = [
       !clientId && 'GOOGLE_CLIENT_ID',
       !clientSecret && 'GOOGLE_CLIENT_SECRET',
-      !refreshToken && 'GOOGLE_REFRESH_TOKEN',
     ]
       .filter(Boolean)
       .join(', ');
     throw new Error(
-      `[google-calendar] Missing Google OAuth credentials in .env: ${missing}`
+      `[google-calendar] Missing Google OAuth client credentials in .env: ${missing}`
     );
   }
 
@@ -175,10 +193,66 @@ export async function getAccessToken(): Promise<string> {
     );
   }
 
-  cachedAccessToken = data.access_token;
-  cachedAccessTokenExpiresAt = Date.now() + ACCESS_TOKEN_TTL_MS;
+  accessTokenCache.set(refreshToken, {
+    token: data.access_token,
+    expiresAt: Date.now() + ACCESS_TOKEN_TTL_MS,
+  });
 
   return data.access_token;
+}
+
+/**
+ * Exchanges a *specific* OAuth 2.0 refresh token — usually the assigned
+ * teacher's personal token from `public.users.google_refresh_token` —
+ * for a fresh access token, so the Google Calendar event is created on
+ * that teacher's calendar and they own the Meet as host.
+ *
+ * Uses the global `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` from `.env`;
+ * it never reads the system-wide `GOOGLE_REFRESH_TOKEN`.
+ *
+ * @param refreshToken The refresh token to exchange (must be non-empty)
+ * @returns            A valid `access_token` string
+ * @throws             If client credentials are missing or Google rejects the grant
+ */
+export async function getTeacherAccessToken(
+  refreshToken: string
+): Promise<string> {
+  if (!refreshToken) {
+    throw new Error(
+      '[google-calendar] getTeacherAccessToken requires a refresh token.'
+    );
+  }
+  return exchangeRefreshToken(refreshToken);
+}
+
+/**
+ * Backwards-compatible, env-based helper. Exchanges the system-wide
+ * `GOOGLE_REFRESH_TOKEN` from `.env` for an access token. Used as a
+ * fallback by the cron route when the assigned teacher has not yet
+ * connected their own Google account.
+ *
+ * @returns A valid `access_token` string
+ * @throws  If credentials are missing from `.env` or Google rejects the grant
+ */
+export async function getAccessToken(): Promise<string> {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    const missing = [
+      !clientId && 'GOOGLE_CLIENT_ID',
+      !clientSecret && 'GOOGLE_CLIENT_SECRET',
+      !refreshToken && 'GOOGLE_REFRESH_TOKEN',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    throw new Error(
+      `[google-calendar] Missing Google OAuth credentials in .env: ${missing}`
+    );
+  }
+
+  return exchangeRefreshToken(refreshToken);
 }
 
 // ─── Events ────────────────────────────────────────────────────
@@ -191,16 +265,29 @@ export async function getAccessToken(): Promise<string> {
  * @param params.description    - Optional event description
  * @param params.startTime      - Start time (ISO 8601)
  * @param params.endTime        - End time (ISO 8601)
- * @param params.attendeeEmails - Invitees; the meeting owner is added by Google
+ * @param params.attendeeEmails - Invitees (students + teacher), whitelisted to
+ *                               bypass the Meet waiting room
+ * @param params.teacherRefreshToken - Personal OAuth refresh token of the
+ *                               calendar owner (teacher), whose calendar the
+ *                               event is created on
  * @returns                     - Google event ID + Meet join link
  * @throws                      - If the event cannot be created or Meet data is missing
  */
 export async function createGoogleMeetEvent(
   params: CreateMeetParams
 ): Promise<GoogleMeetEventResult> {
-  const { title, description, startTime, endTime, attendeeEmails } = params;
+  const {
+    title,
+    description,
+    startTime,
+    endTime,
+    attendeeEmails,
+    teacherRefreshToken,
+  } = params;
 
-  const accessToken = await getAccessToken();
+  // Exchange the calendar owner's (teacher's) refresh token so the event
+  // lands on their calendar with them as the Meet host.
+  const accessToken = await getTeacherAccessToken(teacherRefreshToken);
 
   const requestBody = {
     summary: title,
