@@ -1,4 +1,4 @@
-export { AdminSidebar } from '../layout/AdminSidebar';
+export { Sidebar, Sidebar as AdminSidebar } from './Sidebar';
 export { AdminTopNav } from '../layout/AdminTopNav';
 export { UserEntitlementsCard } from './UserEntitlementsCard';
 export { CourseForm } from './CourseForm';
