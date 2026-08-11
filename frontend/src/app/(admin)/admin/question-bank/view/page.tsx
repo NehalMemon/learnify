@@ -32,6 +32,7 @@ import {
 } from '@/app/actions/taxonomyActions';
 import { Spinner } from '@/components/ui/Spinner';
 import { ImportQuestionsModal } from '@/components/admin/ImportQuestionsModal';
+import { QuestionVaultCard } from '@/components/admin/QuestionVaultCard';
 
 function getRelationName(relation?: { name?: string | null } | { name?: string | null }[] | null): string {
   if (!relation) return '';
@@ -256,7 +257,7 @@ function QuestionBankViewerContent() {
             className="inline-flex items-center gap-1.5 text-xs font-bold text-[#3525cd] transition hover:underline mb-2"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            ← Back to Category Library
+            Back to Category Library
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-[#191c1e] md:text-3xl">
@@ -301,7 +302,7 @@ function QuestionBankViewerContent() {
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8]"
           >
             <Plus className="h-4 w-4" />
-            + Add Questions
+            Add Questions
           </Link>
         </div>
       </div>
@@ -412,7 +413,7 @@ function QuestionBankViewerContent() {
               className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 text-xs font-semibold text-white transition hover:bg-[#2f20b8]"
             >
               <Plus className="h-4 w-4" />
-              + Add Questions to Vault
+              Add Questions to Vault
             </Link>
           </div>
         ) : (
@@ -432,125 +433,15 @@ function QuestionBankViewerContent() {
               ) : null}
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-[#e4e6ef] bg-white shadow-xs">
-              <div className="divide-y divide-[#eceef5]">
-                {filteredQuestions.map((q) => {
-                  const subjName = getRelationName(q.subject);
-
-                  const optionsList: { id: string; text: string }[] =
-                    Array.isArray(q.content?.options)
-                      ? q.content.options
-                      : q.option_a
-                      ? [
-                          { id: 'A', text: q.option_a },
-                          { id: 'B', text: q.option_b },
-                          { id: 'C', text: q.option_c },
-                          { id: 'D', text: q.option_d },
-                        ]
-                      : [];
-
-                  const correctVal = q.correct_answer?.value;
-                  const correctVals: string[] = Array.isArray(q.correct_answer?.values)
-                    ? q.correct_answer.values
-                    : correctVal
-                    ? [String(correctVal)]
-                    : q.correct_option
-                    ? [q.correct_option]
-                    : [];
-
-                  return (
-                    <div key={q.id} className="p-5 transition hover:bg-[#fbfbfd]">
-                      {/* Top row: Badges & Actions */}
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {getTypeBadge(q.type)}
-                          {getDifficultyBadge(q.difficulty)}
-                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                            {q.points || 1} pt{q.points === 1 ? '' : 's'}
-                          </span>
-                          {subjName ? (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700 border border-slate-200">
-                              {subjName}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(q.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50"
-                          title="Delete question"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      {/* Question Text */}
-                      <h3 className="mt-3 text-sm font-bold leading-snug text-[#191c1e]">
-                        {q.question_text}
-                      </h3>
-
-                      {/* Choices / Answers Preview */}
-                      {q.type === 'SHORT_ANSWER' ? (
-                        <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50/60 p-3 text-xs text-emerald-900 font-medium">
-                          <span className="font-bold text-emerald-800">Accepted Answer: </span>
-                          "{correctVal || 'N/A'}"
-                        </div>
-                      ) : optionsList.length > 0 ? (
-                        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
-                          {optionsList.map((opt) => {
-                            const isCorrect =
-                              correctVals.includes(opt.id) ||
-                              (q.correct_option && q.correct_option === opt.id);
-                            return (
-                              <div
-                                key={opt.id}
-                                className={`rounded-xl border p-2.5 ${
-                                  isCorrect
-                                    ? 'border-emerald-300 bg-emerald-50/60 font-semibold text-emerald-900'
-                                    : 'border-[#e4e6ef] bg-[#f7f7fb] text-[#4b4a58]'
-                                }`}
-                              >
-                                <span className="font-bold text-[#3525cd]">{opt.id}: </span>
-                                {opt.text}
-                                {isCorrect ? (
-                                  <CheckCircle2 className="ml-1.5 inline h-3.5 w-3.5 text-emerald-600" />
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-
-                      {/* Explanation & Tags Footer */}
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#eceef5] pt-3 text-xs text-[#777586]">
-                        {q.explanation ? (
-                          <p className="line-clamp-1 italic text-[#696778]">
-                            <span className="font-semibold not-italic text-[#191c1e]">Explanation:</span>{' '}
-                            {q.explanation}
-                          </p>
-                        ) : (
-                          <div />
-                        )}
-
-                        {q.tags && q.tags.length > 0 ? (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Tag className="h-3 w-3 text-[#3525cd]" />
-                            {q.tags.map((tag, idx) => (
-                              <span
-                                key={idx}
-                                className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200/60"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="space-y-4">
+              {filteredQuestions.map((q) => (
+                <QuestionVaultCard
+                  key={q.id}
+                  question={q}
+                  onUpdate={() => fetchQuestions({ silent: true })}
+                  onDelete={handleDelete}
+                />
+              ))}
             </div>
           </div>
         )}

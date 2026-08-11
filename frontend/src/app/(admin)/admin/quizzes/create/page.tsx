@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Database } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import apiClient from "@/lib/api";
 import { toast } from "react-hot-toast";
@@ -14,6 +15,7 @@ import {
 import { saveFullQuiz } from "@/app/actions/quizAdminActions";
 import { PublishQuizModal } from "@/components/admin/PublishQuizModal";
 import { GenerateWithAIModal } from "@/components/admin/GenerateWithAIModal";
+import { AddFromBankModal } from "@/components/admin/AddFromBankModal";
 
 /* ─── Types ──────────────────────────────────────────────────────── */
 
@@ -92,6 +94,7 @@ export default function CreateQuizPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isBankModalOpen, setIsBankModalOpen] = useState(false);
 
   const handleAIGenerate = (aiQuestions: any[]) => {
     aiQuestions.forEach((q) => {
@@ -113,6 +116,32 @@ export default function CreateQuizPage() {
     if (activeIndex === null && aiQuestions.length > 0) {
       setActiveIndex(0);
     }
+  };
+
+  const handleBankImport = (importedQuestions: any[]) => {
+    if (!importedQuestions || importedQuestions.length === 0) return;
+    const currentQuestions = getValues("questions") || [];
+    const initialLength = currentQuestions.length;
+    importedQuestions.forEach((q) => {
+      append({
+        type: (q.type as QuestionType) || "SINGLE_CHOICE",
+        questionText: q.questionText || q.question_text || "",
+        optionA: q.optionA || q.option_a || "",
+        optionB: q.optionB || q.option_b || "",
+        optionC: q.optionC || q.option_c || "",
+        optionD: q.optionD || q.option_d || "",
+        matchA: q.matchA || "",
+        matchB: q.matchB || "",
+        matchC: q.matchC || "",
+        matchD: q.matchD || "",
+        correctOption: q.correctOption || q.correct_option || "A",
+        explanation: q.explanation || "",
+      });
+    });
+    if (activeIndex === null) {
+      setActiveIndex(initialLength);
+    }
+    toast.success(`Imported ${importedQuestions.length} question${importedQuestions.length === 1 ? "" : "s"} from the vault!`);
   };
 
   /* ── React Hook Form ─────────────────────────────────────────── */
@@ -152,6 +181,7 @@ export default function CreateQuizPage() {
   /* ── Watched values ──────────────────────────────────────────── */
   const watchedTitle = watch("title");
   const watchedCategoryId = watch("categoryId");
+  const watchedSubjectId = watch("subjectId");
   const watchedQuestions = watch("questions");
 
   // Dynamically filter subjects for the selected category
@@ -333,7 +363,7 @@ export default function CreateQuizPage() {
           onClick={() => router.back()}
           className="mb-6 flex items-center gap-1.5 text-sm text-gray-500 transition hover:text-gray-900"
         >
-          ← Back
+          <ArrowLeft className="h-4 w-4" /> Back
         </button>
 
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-gray-900 mb-2">
@@ -478,10 +508,10 @@ export default function CreateQuizPage() {
           <button
             type="button"
             onClick={() => setStep(1)}
-            className="text-sm text-gray-500 hover:text-gray-900 transition"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition"
             aria-label="Back to setup"
           >
-            ← Back
+            <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <h2 className="text-lg font-semibold text-gray-900 truncate max-w-xs">
             {watchedTitle || "Untitled Quiz"}
@@ -846,6 +876,23 @@ export default function CreateQuizPage() {
             </button>
           </div>
 
+          {/* Question Bank Tools */}
+          <div>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
+              Question Bank
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsBankModalOpen(true)}
+              disabled={!watchedCategoryId}
+              title={!watchedCategoryId ? "Select a Category first" : "Import questions from category vault"}
+              className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-800 p-3 rounded-lg hover:bg-gray-50 transition-all font-medium text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            >
+              <Database className="h-4 w-4 text-[#3525cd]" />
+              Add from Bank
+            </button>
+          </div>
+
           {/* Question type cards */}
           <div>
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-widest text-gray-500">
@@ -893,6 +940,13 @@ export default function CreateQuizPage() {
         isOpen={isAIModalOpen}
         onClose={() => setIsAIModalOpen(false)}
         onGenerate={handleAIGenerate}
+      />
+      <AddFromBankModal
+        isOpen={isBankModalOpen}
+        onClose={() => setIsBankModalOpen(false)}
+        categoryId={watchedCategoryId || ""}
+        subjectId={watchedSubjectId}
+        onImport={handleBankImport}
       />
     </>
   );

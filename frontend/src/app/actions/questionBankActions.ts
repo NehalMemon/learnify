@@ -235,3 +235,50 @@ export async function deleteBankQuestion(id: string) {
     throw error instanceof Error ? error : new Error('Unexpected error while deleting question');
   }
 }
+
+export interface UpdateBankQuestionInput {
+  type?: BankQuestionType;
+  question_text?: string;
+  points?: number;
+  explanation?: string | null;
+  difficulty?: QuestionDifficulty;
+  content?: Record<string, unknown>;
+  correct_answer?: Record<string, unknown>;
+}
+
+export async function updateBankQuestion(id: string, input: UpdateBankQuestionInput) {
+  try {
+    const supabase = await createClient();
+
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (input.type) payload.type = input.type;
+    if (input.question_text !== undefined) payload.question_text = input.question_text.trim();
+    if (input.points !== undefined) payload.points = Number(input.points) || 1;
+    if (input.explanation !== undefined) payload.explanation = input.explanation ? input.explanation.trim() : null;
+    if (input.difficulty) payload.difficulty = input.difficulty;
+    if (input.content !== undefined) payload.content = input.content;
+    if (input.correct_answer !== undefined) payload.correct_answer = input.correct_answer;
+
+    const { data, error } = await supabase
+      .from('question_bank')
+      .update(payload)
+      .eq('id', id)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('updateBankQuestion error:', error);
+      throw new Error(error.message);
+    }
+
+    revalidatePath('/admin/question-bank');
+    return { success: true, data };
+  } catch (error) {
+    console.error('updateBankQuestion unexpected error:', error);
+    throw error instanceof Error ? error : new Error('Unexpected error while updating question');
+  }
+}
+

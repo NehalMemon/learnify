@@ -192,7 +192,7 @@ export default function QuestionBankLibraryPage() {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#3525cd]/25 transition hover:bg-[#2f20b8] whitespace-nowrap"
           >
             <Plus className="h-4 w-4" />
-            + Add to Bank
+            Add to Bank
           </button>
         </div>
       </div>
@@ -224,7 +224,7 @@ export default function QuestionBankLibraryPage() {
               className="mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#3525cd] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2f20b8] whitespace-nowrap"
             >
               <Plus className="h-4 w-4" />
-              + Add to Bank
+              Add to Bank
             </button>
           </div>
         ) : (
