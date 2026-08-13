@@ -86,7 +86,12 @@ export async function updateSession(request: NextRequest) {
 
   if (isPublicOrAuthPage && user) {
     const role = user.app_metadata?.role || user.user_metadata?.role
-    const targetPath = role === 'ADMIN' ? '/admin/dashboard' : '/student/dashboard'
+    let targetPath = '/student'
+    if (role === 'ADMIN') {
+      targetPath = '/admin'
+    } else if (role === 'INSTRUCTOR') {
+      targetPath = '/instructor'
+    }
     const url = new URL(targetPath, request.url)
     return createRedirectResponse(url)
   }

@@ -154,45 +154,47 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-50 flex h-screen h-[100dvh] flex-col border-r border-gray-200 bg-[#fbfbfd] font-sans text-gray-900 antialiased transition-all duration-300 ease-in-out ${
+      className={`fixed left-0 top-0 z-50 flex h-screen h-[100dvh] flex-col border-r border-gray-200 bg-[#fbfbfd] font-sans text-gray-900 antialiased transition-all duration-300 ease-in-out overflow-x-hidden ${
         isCollapsed ? 'w-[88px]' : 'w-64'
       } ${
         isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       } ${className}`}
     >
       {/* ── Header Area (Logo Expand Action & Conditional Collapse Toggle) ── */}
-      <div className={`p-4 border-b border-gray-100 ${isCollapsed ? 'px-2 flex justify-center' : ''}`}>
+      <div className={`p-4 border-b border-gray-100 overflow-x-hidden ${isCollapsed ? 'px-2 flex justify-center' : ''}`}>
         {isCollapsed ? (
           /* Minimized/Collapsed State: Click brand logo container to expand */
-          <div className="relative group">
+          <div className="relative group flex justify-center">
             <button
               type="button"
               onClick={handleToggle}
               title="Click logo to expand sidebar"
               aria-label="Expand sidebar"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-600 text-white shadow-md shadow-purple-600/25 transition-transform duration-200 group-hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-600 text-white shadow-md shadow-purple-600/25 transition-transform duration-200 group-hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             >
               <School className="h-5 w-5" />
             </button>
 
             {/* Collapsed Logo Tooltip */}
-            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-x-1 group-hover:translate-x-0 transition-all duration-150 z-50 whitespace-nowrap pointer-events-none">
-              Expand Sidebar
-              <div className="absolute top-1/2 -left-1 -mt-1 border-4 border-transparent border-r-gray-900" />
-            </div>
+            {isCollapsed && (
+              <div className="absolute left-full ml-3 hidden group-hover:flex items-center px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none transition-all duration-150 ease-in-out top-1/2 -translate-y-1/2">
+                Expand Sidebar
+                <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+              </div>
+            )}
           </div>
         ) : (
           /* Fully Open/Expanded State: Brand logo on left + clean toggle button on top right */
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center justify-between w-full overflow-x-hidden">
+            <div className="flex items-center gap-3 overflow-x-hidden">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white shadow-md shadow-purple-600/25">
                 <School className="h-5 w-5" />
               </div>
-              <div className="flex flex-col text-left whitespace-nowrap opacity-100 transition-opacity duration-300">
-                <span className="text-base font-extrabold tracking-tight text-gray-900 leading-tight">
+              <div className="flex flex-col text-left whitespace-nowrap overflow-x-hidden opacity-100 transition-opacity duration-300">
+                <span className="text-base font-extrabold tracking-tight text-gray-900 leading-tight whitespace-nowrap">
                   Learnify
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 whitespace-nowrap">
                   Management Console
                 </span>
               </div>
@@ -204,7 +206,7 @@ export function Sidebar({
               onClick={handleToggle}
               title="Collapse sidebar"
               aria-label="Collapse sidebar"
-              className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-colors"
+              className="rounded-xl p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-colors shrink-0"
             >
               <PanelLeftClose className="h-5 w-5" />
             </button>
@@ -213,19 +215,19 @@ export function Sidebar({
       </div>
 
       {/* ── Primary Navigation List ── */}
-      <nav className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2.5 py-3' : 'px-3 py-3'}`}>
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden ${isCollapsed ? 'px-2.5 py-3' : 'px-3 py-3'}`}>
         <ul className="space-y-1.5">
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
 
             return (
-              <li key={item.href} className="relative group">
+              <li key={item.href} className="relative group flex justify-center">
                 <Link
                   href={item.href}
                   onClick={onMobileClose}
-                  className={`relative flex min-h-[44px] items-center gap-3 rounded-xl py-2.5 text-sm font-bold transition-all duration-200 ${
-                    isCollapsed ? 'justify-center px-0' : 'px-3.5'
+                  className={`relative flex items-center rounded-xl text-sm font-bold transition-all duration-200 ${
+                    isCollapsed ? 'h-11 w-11 justify-center p-0' : 'min-h-[44px] w-full gap-3 px-3.5 py-2.5'
                   } ${
                     active
                       ? isCollapsed
@@ -235,7 +237,7 @@ export function Sidebar({
                   }`}
                 >
                   {active && !isCollapsed && (
-                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-purple-600" />
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-purple-600 shrink-0" />
                   )}
                   <Icon
                     className={`h-[18px] w-[18px] shrink-0 transition-colors ${
@@ -246,14 +248,14 @@ export function Sidebar({
                         : 'text-gray-400 group-hover:text-gray-700'
                     }`}
                   />
-                  {!isCollapsed && <span className="flex-1 truncate">{item.label}</span>}
+                  {isCollapsed ? null : <span className="flex-1 truncate whitespace-nowrap overflow-x-hidden">{item.label}</span>}
                 </Link>
 
                 {/* Collapsed Hover Tooltip */}
                 {isCollapsed && (
-                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-x-1 group-hover:translate-x-0 transition-all duration-150 z-50 whitespace-nowrap pointer-events-none">
+                  <div className="absolute left-full ml-3 hidden group-hover:flex items-center px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none transition-all duration-150 ease-in-out top-1/2 -translate-y-1/2">
                     {item.label}
-                    <div className="absolute top-1/2 -left-1 -mt-1 border-4 border-transparent border-r-gray-900" />
+                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
                   </div>
                 )}
               </li>
@@ -263,14 +265,14 @@ export function Sidebar({
       </nav>
 
       {/* ── Streamlined Bottom Actions (Settings & Profile / Logout) ── */}
-      <div className={`border-t border-gray-200/80 bg-white/50 ${isCollapsed ? 'p-2.5' : 'p-3.5'} space-y-2`}>
+      <div className={`border-t border-gray-200/80 bg-white/50 overflow-x-hidden ${isCollapsed ? 'p-2.5' : 'p-3.5'} space-y-2`}>
         {/* Settings Anchor Link */}
-        <div className="relative group">
+        <div className="relative group flex justify-center">
           <Link
             href="/admin/settings"
             onClick={onMobileClose}
-            className={`relative flex min-h-[44px] items-center gap-3 rounded-xl py-2.5 text-sm font-bold transition-all duration-200 ${
-              isCollapsed ? 'justify-center px-0' : 'px-3.5'
+            className={`relative flex items-center rounded-xl text-sm font-bold transition-all duration-200 ${
+              isCollapsed ? 'h-11 w-11 justify-center p-0' : 'min-h-[44px] w-full gap-3 px-3.5 py-2.5'
             } ${
               isSettingsActive
                 ? isCollapsed
@@ -280,7 +282,7 @@ export function Sidebar({
             }`}
           >
             {isSettingsActive && !isCollapsed && (
-              <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-purple-600" />
+              <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-purple-600 shrink-0" />
             )}
             <Settings
               className={`h-[18px] w-[18px] shrink-0 transition-colors ${
@@ -291,25 +293,25 @@ export function Sidebar({
                   : 'text-gray-400 group-hover:text-gray-700'
               }`}
             />
-            {!isCollapsed && <span className="flex-1 truncate">Settings</span>}
+            {isCollapsed ? null : <span className="flex-1 truncate whitespace-nowrap overflow-x-hidden">Settings</span>}
           </Link>
 
           {/* Collapsed Settings Tooltip */}
           {isCollapsed && (
-            <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-x-1 group-hover:translate-x-0 transition-all duration-150 z-50 whitespace-nowrap pointer-events-none">
+            <div className="absolute left-full ml-3 hidden group-hover:flex items-center px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none transition-all duration-150 ease-in-out top-1/2 -translate-y-1/2">
               Settings
-              <div className="absolute top-1/2 -left-1 -mt-1 border-4 border-transparent border-r-gray-900" />
+              <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
             </div>
           )}
         </div>
 
         {/* User Profile Card with Secondary Logout Action */}
         <div
-          className={`flex items-center gap-3 rounded-2xl border border-gray-200/80 bg-white p-2.5 shadow-sm transition-all ${
-            isCollapsed ? 'justify-center border-0 bg-transparent p-0 shadow-none' : ''
+          className={`flex items-center rounded-2xl border border-gray-200/80 bg-white p-2.5 shadow-sm transition-all overflow-x-hidden ${
+            isCollapsed ? 'justify-center border-0 bg-transparent p-0 shadow-none' : 'gap-3'
           }`}
         >
-          <div className="relative shrink-0 group">
+          <div className="relative shrink-0 group flex justify-center">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-purple-50 font-bold text-purple-700 shadow-xs">
               {getInitials(profileName)}
             </div>
@@ -317,21 +319,21 @@ export function Sidebar({
 
             {/* Collapsed Profile & Logout Tooltip */}
             {isCollapsed && (
-              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-x-1 group-hover:translate-x-0 transition-all duration-150 z-50 whitespace-nowrap pointer-events-none">
+              <div className="absolute left-full ml-3 hidden group-hover:flex flex-col px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none transition-all duration-150 ease-in-out top-1/2 -translate-y-1/2">
                 <p className="font-bold">{profileName}</p>
                 <p className="text-[10px] text-gray-300">{profileRole}</p>
-                <div className="absolute top-1/2 -left-1 -mt-1 border-4 border-transparent border-r-gray-900" />
+                <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
               </div>
             )}
           </div>
 
-          {!isCollapsed && (
+          {isCollapsed ? null : (
             <>
-              <div className="flex flex-1 flex-col min-w-0">
-                <span className="truncate text-sm font-bold text-gray-900 leading-tight">
+              <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden whitespace-nowrap">
+                <span className="truncate text-sm font-bold text-gray-900 leading-tight whitespace-nowrap overflow-x-hidden">
                   {profileName}
                 </span>
-                <span className="truncate text-[11px] font-medium text-gray-500">
+                <span className="truncate text-[11px] font-medium text-gray-500 whitespace-nowrap overflow-x-hidden">
                   {profileRole}
                 </span>
               </div>

@@ -187,7 +187,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <AdminSidebar
         isCollapsed={isCollapsed}
         onToggleCollapse={handleToggleCollapse}
@@ -204,7 +204,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
       ) : null}
 
-      <div className={`transition-all duration-300 ease-in-out ${isCollapsed ? 'lg:pl-[88px]' : 'lg:pl-64'}`}>
+      <div className={`transition-all duration-300 ease-in-out overflow-x-hidden ${isCollapsed ? 'lg:pl-[88px]' : 'lg:pl-64'}`}>
         <AdminTopNav onMobileMenuToggle={() => setIsMobileSidebarOpen(true)} />
         <main className="page-container">{children}</main>
       </div>
