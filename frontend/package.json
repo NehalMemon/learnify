@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node dev-server.js",
     "dev:cron": "node scripts/dev-cron.mjs",
     "build": "next build",
     "build:bones": "boneyard-js build",

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   BookOpen,
@@ -14,20 +15,14 @@ import {
   User,
   Users,
   Video,
-  X,
 } from 'lucide-react';
-import { CreateClassForm } from '@/components/live-classes/CreateClassForm';
 import { deleteLiveClass } from '@/actions/live-class';
-import type { LiveClassRow } from '@/types/live-class';
-import type { ClassStatus } from '@/types/live-class';
+import type { LiveClassRow, ClassStatus } from '@/types/live-class';
 
 // ── Types ───────────────────────────────────────────────────────
 
 export interface LiveClassesDashboardProps {
   liveClasses: LiveClassRow[];
-  courses: { id: string; title: string }[];
-  teachers: { id: string; name: string }[];
-  students: { id: string; name: string }[];
   /** Non-fatal data-fetch warning surfaced in a banner; the grid still renders. */
   error?: string | null;
 }
@@ -64,14 +59,18 @@ const recurrenceLabel = (recurrence: string) =>
 
 export function LiveClassesDashboard({
   liveClasses,
-  courses,
-  teachers,
-  students,
   error = null,
 }: LiveClassesDashboardProps) {
   const router = useRouter();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const searchParams = useSearchParams();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const created = searchParams.get('created');
+
+  useEffect(() => {
+    if (created !== '1') return;
+    toast.success('Live class scheduled successfully!');
+    router.replace('/admin/live-classes');
+  }, [created, router]);
 
   const formatDateTime = (iso: string) =>
     new Date(iso).toLocaleString('en-GB', {
@@ -115,32 +114,25 @@ export function LiveClassesDashboard({
     }
   };
 
-  const handleCreated = () => {
-    setIsModalOpen(false);
-    router.refresh();
-  };
-
   return (
     <div className="space-y-6">
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
-            Live Classes Management
+            Class Library
           </h1>
           <p className="mt-1 text-xs text-gray-500">
-            Schedule, track, and manage Google Meet classes across every course.
+            Live Classes — track and manage Google Meet sessions across every course.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
+        <Link
+          href="/admin/live-classes/create"
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:ring-offset-2"
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Schedule Class
-        </button>
+          + Schedule New Class
+        </Link>
       </div>
 
       {/* ── Non-fatal data warning banner ─────────────────────── */}
@@ -273,49 +265,13 @@ export function LiveClassesDashboard({
             Schedule your first Google Meet class and the link will be generated automatically
             before the session starts.
           </p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
+          <Link
+            href="/admin/live-classes/create"
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-purple-700"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Schedule Class
-          </button>
-        </div>
-      )}
-
-      {/* ── Schedule modal ─────────────────────────────────────── */}
-      {isModalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="create-class-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-        >
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 pb-4 pt-6">
-              <h2 id="create-class-modal-title" className="text-xl font-bold text-gray-900">
-                Schedule a Live Class
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="rounded-lg p-1 text-gray-400 transition hover:text-gray-600"
-                aria-label="Close schedule modal"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="px-6 py-5">
-              <CreateClassForm
-                courses={courses}
-                availableTeachers={teachers}
-                availableStudents={students}
-                onSuccess={handleCreated}
-              />
-            </div>
-          </div>
+            Schedule New Class
+          </Link>
         </div>
       )}
     </div>
