@@ -25,10 +25,18 @@ export async function loginWithEmail(formData: FormData) {
     return { error: error?.message || 'Login failed' }
   }
 
-  // Direct redirect after successful login when used as a form action.
-  // Next.js will handle navigation and cache invalidation.
-  revalidatePath('/', 'layout');
-  redirect(data.user.app_metadata?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
+  // Traffic Cop Routing Logic: Safely extract role from app_metadata or user_metadata
+  const role = data.user.app_metadata?.role || data.user.user_metadata?.role
+
+  revalidatePath('/', 'layout')
+
+  if (role === 'ADMIN') {
+    redirect('/admin')
+  } else if (role === 'INSTRUCTOR') {
+    redirect('/instructor')
+  } else {
+    redirect('/student')
+  }
 }
 
 
