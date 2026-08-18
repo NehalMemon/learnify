@@ -10,17 +10,18 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data?.user) {
-      // Traffic Cop Routing Logic: Safely extract role from app_metadata or user_metadata
-      const role = data.user.app_metadata?.role || data.user.user_metadata?.role
+      console.log('=== AUTH DEBUG ===');
+      console.log('App Metadata Role:', data.user.app_metadata?.role);
+      console.log('User Metadata Role:', data.user.user_metadata?.role);
+      console.log('==================');
 
-      let redirectPath = '/student'
+      const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
+
       if (role === 'ADMIN') {
-        redirectPath = '/admin'
-      } else if (role === 'INSTRUCTOR') {
-        redirectPath = '/instructor'
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      } else {
+        return NextResponse.redirect(new URL(next, request.url))
       }
-
-      return NextResponse.redirect(new URL(redirectPath, request.url))
     }
   }
 

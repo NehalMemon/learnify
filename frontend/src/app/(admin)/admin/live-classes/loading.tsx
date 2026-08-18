@@ -2,7 +2,7 @@
  * Loading skeleton for /admin/live-classes.
  *
  * Rendered by the App Router during first navigation so the admin sees a
- * placeholder instead of a blank content area while the four parallel
+ * placeholder instead of a blank content area while the parallel
  * Supabase queries resolve.
  */
 export default function AdminLiveClassesLoading() {
