@@ -24,6 +24,9 @@ export interface User {
   doctorsQuizzEnabled?: boolean;
   universityProgram?: string | null;
   studyYear?: number;
+  educationBoard?: string | null;
+  classGrade?: string | null;
+  avatarUrl?: string | null;
   accessExpiresAt?: string | Date | null;
   createdAt: string;
   updatedAt: string;
