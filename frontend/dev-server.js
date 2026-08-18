@@ -9,10 +9,8 @@ const port = process.env.PORT || 3000;
 
 console.log(`🚀 Starting Next.js development server on port ${port}...`);
 
-// Spawn Next.js dev process dynamically on the configured port.
-// Command string + shell:true avoids DEP0190 (args are concatenated when shell is used).
-// PORT comes from env, so there is no injection surface.
-const child = spawn(`npx next dev -p ${port}`, {
+// Spawn Next.js dev process dynamically on the configured port
+const child = spawn('npx', ['next', 'dev', '-p', port], {
   stdio: 'inherit',
   shell: true,
 });
