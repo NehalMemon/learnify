@@ -31,6 +31,9 @@ export interface Database {
           has_seen_quiz_disclaimer: boolean;
           university_program: string | null;
           study_year: number | null;
+          education_board: string | null;
+          class_grade: string | null;
+          avatar_url: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -45,6 +48,9 @@ export interface Database {
           has_seen_quiz_disclaimer?: boolean;
           university_program?: string | null;
           study_year?: number | null;
+          education_board?: string | null;
+          class_grade?: string | null;
+          avatar_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -59,6 +65,9 @@ export interface Database {
           has_seen_quiz_disclaimer?: boolean;
           university_program?: string | null;
           study_year?: number | null;
+          education_board?: string | null;
+          class_grade?: string | null;
+          avatar_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
