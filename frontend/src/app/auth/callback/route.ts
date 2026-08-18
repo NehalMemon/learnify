@@ -8,10 +8,21 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
-      return NextResponse.redirect(new URL(next, request.url))
+    if (!error && data?.user) {
+      console.log('=== AUTH DEBUG ===');
+      console.log('App Metadata Role:', data.user.app_metadata?.role);
+      console.log('User Metadata Role:', data.user.user_metadata?.role);
+      console.log('==================');
+
+      const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
+
+      if (role === 'ADMIN') {
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url))
+      } else {
+        return NextResponse.redirect(new URL(next, request.url))
+      }
     }
   }
 

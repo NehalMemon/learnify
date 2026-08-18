@@ -25,10 +25,22 @@ export async function loginWithEmail(formData: FormData) {
     return { error: error?.message || 'Login failed' }
   }
 
+  console.log('=== AUTH DEBUG ===');
+  console.log('App Metadata Role:', data.user.app_metadata?.role);
+  console.log('User Metadata Role:', data.user.user_metadata?.role);
+  console.log('==================');
+
+  const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
+
   // Direct redirect after successful login when used as a form action.
   // Next.js will handle navigation and cache invalidation.
   revalidatePath('/', 'layout');
-  redirect(data.user.app_metadata?.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
+
+  if (role === 'ADMIN') {
+    redirect('/admin/dashboard');
+  } else {
+    redirect('/dashboard');
+  }
 }
 
 

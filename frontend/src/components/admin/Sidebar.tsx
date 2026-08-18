@@ -36,10 +36,11 @@ const primaryNavItems: NavItem[] = [
   { href: '/admin/students', label: 'Student Management', icon: UserCheck },
   { href: '/admin/requests', label: 'Credit Requests', icon: Coins },
   { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree },
-  { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
   { href: '/admin/quizzes/library', label: 'Quiz Library', icon: BookOpen },
+  { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
+  { href: '/admin/live-classes', label: 'Classes Library', icon: Video },
+  { href: '/admin/live-classes/builder', label: 'Classes Builder', icon: School },
   { href: '/admin/question-bank', label: 'Question Bank', icon: Database },
-  { href: '/admin/live-classes', label: 'Class Library', icon: Video },
 ];
 
 export interface SidebarProps {
@@ -133,6 +134,14 @@ export function Sidebar({
 
   const isActive = (href: string) => {
     if (pathname === href) return true;
+
+    if (href === '/admin/live-classes') {
+      return pathname === '/admin/live-classes';
+    }
+
+    if (href === '/admin/live-classes/builder') {
+      return pathname.startsWith('/admin/live-classes/builder');
+    }
 
     if (href === '/admin/quizzes' || href === '/admin/quizzes/builder') {
       if (pathname.startsWith('/admin/quizzes/library')) return false;
