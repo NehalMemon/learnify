@@ -5,8 +5,3 @@
 .cursor/
 .impeccable/
 .vscode/
-
-
-git add .
-git commit -m "chore: clean up repository structure and remove unused backend"
-git push
