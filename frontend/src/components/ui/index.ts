@@ -4,3 +4,5 @@ export { Textarea } from './Textarea';
 export { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from './Card';
 export { Badge } from './Badge';
 export { Spinner } from './Spinner';
+export { CloudinaryUploader } from './CloudinaryUploader';
+

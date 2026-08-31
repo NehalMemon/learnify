@@ -4,17 +4,16 @@ import { createClient } from '@/utils/supabase/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const nextParam = requestUrl.searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+    ? nextParam
+    : '/dashboard'
 
   if (code) {
     const supabase = await createClient()
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data?.user) {
-      console.log('=== AUTH DEBUG ===');
-      console.log('App Metadata Role:', data.user.app_metadata?.role);
-      console.log('User Metadata Role:', data.user.user_metadata?.role);
-      console.log('==================');
-
       const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
 
       if (role === 'ADMIN') {

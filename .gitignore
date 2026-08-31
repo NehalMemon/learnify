@@ -1,0 +1,7 @@
+# Editor and AI Agent directories
+.agent/
+.agents/
+.codex/
+.cursor/
+.impeccable/
+.vscode/
