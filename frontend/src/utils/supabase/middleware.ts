@@ -72,7 +72,7 @@ export async function updateSession(request: NextRequest) {
   if (pathname.startsWith('/admin') && user) {
     const role = user.app_metadata?.role || user.user_metadata?.role
     if (role !== 'ADMIN') {
-      const url = new URL('/student/dashboard', request.url)
+      const url = new URL('/dashboard', request.url)
       return createRedirectResponse(url)
     }
   }

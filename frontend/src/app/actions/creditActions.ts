@@ -74,7 +74,6 @@ export async function submitCreditRequest({
       revalidatePath('/admin/requests');
       revalidatePath('/admin/payments');
       revalidatePath('/student/credits');
-      revalidatePath('/student/dashboard');
       revalidatePath('/dashboard/credits');
       revalidatePath('/dashboard');
     } catch (cacheErr) {

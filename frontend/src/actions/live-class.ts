@@ -52,13 +52,14 @@ export async function createLiveClass(payload: CreateLiveClassPayload) {
         status: 'SCHEDULED',
       })
       .select('*')
-      .single()
-      .returns<LiveClass>();
+      .single();
 
     if (error) {
       console.error('createLiveClass error:', error);
       return { success: false, error: error.message };
     }
+
+    const liveClassData = data as unknown as LiveClass;
 
     // Teacher-owned Meet generation: warn when the assigned teacher hasn't
     // connected their Google account, so the admin can fix it before the
@@ -81,7 +82,7 @@ export async function createLiveClass(payload: CreateLiveClassPayload) {
     }
 
     revalidatePath('/admin/live-classes');
-    return warning ? { success: true, data, warning } : { success: true, data };
+    return warning ? { success: true, data: liveClassData, warning } : { success: true, data: liveClassData };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create live class';
     console.error('createLiveClass exception:', err);
@@ -129,13 +130,12 @@ export async function getLiveClassById(id: string) {
       .from('live_classes')
       .select('*')
       .eq('id', id)
-      .maybeSingle()
-      .returns<LiveClass>();
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: error.message, data: null };
     }
-    return { success: true, data };
+    return { success: true, data: data as unknown as LiveClass | null };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch live class';
     return { success: false, error: message, data: null };
@@ -164,8 +164,7 @@ export async function updateLiveClass(id: string, payload: Partial<CreateLiveCla
       .update(updateData)
       .eq('id', id)
       .select('*')
-      .single()
-      .returns<LiveClass>();
+      .single();
 
     if (error) {
       return { success: false, error: error.message };
@@ -205,12 +204,13 @@ export async function getAdminLiveClasses() {
 export async function duplicateLiveClass(id: string) {
   try {
     const supabase = await createClient();
-    const { data: original, error: fetchErr } = await supabase
+    const { data: rawOriginal, error: fetchErr } = await supabase
       .from('live_classes')
       .select('*')
       .eq('id', id)
-      .maybeSingle()
-      .returns<LiveClass>();
+      .maybeSingle();
+
+    const original = rawOriginal as unknown as LiveClass | null;
 
     if (fetchErr || !original) {
       return { success: false, error: fetchErr?.message || 'Original class not found' };
@@ -231,8 +231,7 @@ export async function duplicateLiveClass(id: string) {
         status: 'SCHEDULED',
       })
       .select('*')
-      .single()
-      .returns<LiveClass>();
+      .single();
 
     if (error) {
       return { success: false, error: error.message };
