@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { BookOpen, Calendar, Check, Clock, Loader2, User, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { createLiveClass } from '@/actions/live-class';
@@ -13,7 +14,7 @@ export interface CreateClassFormProps {
   courses: { id: string; title: string }[];
   availableTeachers: { id: string; name: string }[];
   availableStudents: { id: string; name: string }[];
-  /** Called after a successful create so the parent can close the modal / refresh. */
+  /** Optional callback invoked right before redirecting back to the library. */
   onSuccess?: () => void;
 }
 
@@ -71,6 +72,7 @@ export function CreateClassForm({
   availableStudents,
   onSuccess,
 }: CreateClassFormProps) {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,12 +168,12 @@ export function CreateClassForm({
       // knows the Meet meeting won't be created on the teacher's calendar yet.
       if ('warning' in result && result.warning) {
         toast(result.warning, { icon: '⚠️', duration: 6000 });
-      } else {
-        toast.success('Live class scheduled successfully!');
       }
       setForm(EMPTY_FORM);
       setErrors({});
       onSuccess?.();
+      // Return to the class library where the new class is now visible.
+      router.push('/admin/live-classes?created=1');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong.';
       toast.error(message);

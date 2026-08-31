@@ -15,6 +15,18 @@ const child = spawn('npx', ['next', 'dev', '-p', port], {
   shell: true,
 });
 
+// Forward termination signals so Ctrl+C / kill also stops the child process
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+  process.on(signal, () => {
+    child.kill(signal);
+  });
+});
+
+child.on('error', (err) => {
+  console.error('Failed to start Next.js development server:', err);
+  process.exit(1);
+});
+
 child.on('close', (code) => {
-  process.exit(code);
+  process.exit(code ?? 0);
 });

@@ -25,17 +25,21 @@ export async function loginWithEmail(formData: FormData) {
     return { error: error?.message || 'Login failed' }
   }
 
-  // Traffic Cop Routing Logic: Safely extract role from app_metadata or user_metadata
-  const role = data.user.app_metadata?.role || data.user.user_metadata?.role
+  console.log('=== AUTH DEBUG ===');
+  console.log('App Metadata Role:', data.user.app_metadata?.role);
+  console.log('User Metadata Role:', data.user.user_metadata?.role);
+  console.log('==================');
 
-  revalidatePath('/', 'layout')
+  const role = data.user.app_metadata?.role || data.user.user_metadata?.role;
+
+  // Direct redirect after successful login when used as a form action.
+  // Next.js will handle navigation and cache invalidation.
+  revalidatePath('/', 'layout');
 
   if (role === 'ADMIN') {
-    redirect('/admin')
-  } else if (role === 'INSTRUCTOR') {
-    redirect('/instructor')
+    redirect('/admin/dashboard');
   } else {
-    redirect('/student')
+    redirect('/dashboard');
   }
 }
 

@@ -35,11 +35,11 @@ const primaryNavItems: NavItem[] = [
   { href: '/admin/instructors', label: 'Instructor Management', icon: Briefcase },
   { href: '/admin/students', label: 'Student Management', icon: UserCheck },
   { href: '/admin/requests', label: 'Credit Requests', icon: Coins },
-  { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree },
-  { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
   { href: '/admin/quizzes/library', label: 'Quiz Library', icon: BookOpen },
+  { href: '/admin/quizzes', label: 'Quiz Builder', icon: FileEdit },
+  { href: '/admin/live-classes', label: 'Classes Library', icon: Video },
+  { href: '/admin/live-classes/builder', label: 'Classes Builder', icon: School },
   { href: '/admin/question-bank', label: 'Question Bank', icon: Database },
-  { href: '/admin/live-classes', label: 'Class Library', icon: Video },
 ];
 
 export interface SidebarProps {
@@ -65,6 +65,7 @@ export function Sidebar({
 
   const [profileName, setProfileName] = useState<string>('Admin');
   const [profileRole, setProfileRole] = useState<string>('Administrator');
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   // Sync state with localStorage if uncontrolled
   useEffect(() => {
@@ -90,13 +91,22 @@ export function Sidebar({
     let cancelled = false;
     const fetchUser = async () => {
       try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const role = session?.user?.app_metadata?.role || session?.user?.user_metadata?.role;
+        if (!cancelled && role) {
+          setUserRole(role);
+        }
+
         if (user?.fullName) {
           setProfileName(user.fullName);
           setProfileRole(user.role === 'ADMIN' ? 'Chief Administrator' : user.role || 'Administrator');
+          if (!role && user.role) {
+            setUserRole(user.role);
+          }
           return;
         }
 
-        const supabase = createClient();
         const { data: { user: sbUser } } = await supabase.auth.getUser();
         if (cancelled) return;
 
@@ -108,11 +118,15 @@ export function Sidebar({
 
         setProfileName(name);
 
-        const role =
+        const resolvedRole =
           sbUser?.app_metadata?.role ??
           sbUser?.user_metadata?.role ??
           'Administrator';
-        setProfileRole(role === 'ADMIN' ? 'Chief Administrator' : role);
+        setProfileRole(resolvedRole === 'ADMIN' ? 'Chief Administrator' : resolvedRole);
+
+        if (!role && resolvedRole) {
+          setUserRole(resolvedRole);
+        }
       } catch {
         // Fallback defaults
       }
@@ -133,6 +147,14 @@ export function Sidebar({
 
   const isActive = (href: string) => {
     if (pathname === href) return true;
+
+    if (href === '/admin/live-classes') {
+      return pathname === '/admin/live-classes';
+    }
+
+    if (href === '/admin/live-classes/builder') {
+      return pathname.startsWith('/admin/live-classes/builder');
+    }
 
     if (href === '/admin/quizzes' || href === '/admin/quizzes/builder') {
       if (pathname.startsWith('/admin/quizzes/library')) return false;
@@ -261,6 +283,53 @@ export function Sidebar({
               </li>
             );
           })}
+
+          {/* Gatekept Taxonomy Manager Link: Strictly renders ONLY if userRole === 'SUPER_ADMIN' */}
+          {userRole === 'SUPER_ADMIN' && (() => {
+            const taxonomyItem: NavItem = { href: '/admin/taxonomy', label: 'Taxonomy Manager', icon: FolderTree };
+            const Icon = taxonomyItem.icon;
+            const active = isActive(taxonomyItem.href);
+
+            return (
+              <li key={taxonomyItem.href} className="relative group flex justify-center">
+                <Link
+                  href={taxonomyItem.href}
+                  onClick={onMobileClose}
+                  className={`relative flex items-center rounded-xl text-sm font-bold transition-all duration-200 ${
+                    isCollapsed ? 'h-11 w-11 justify-center p-0' : 'min-h-[44px] w-full gap-3 px-3.5 py-2.5'
+                  } ${
+                    active
+                      ? isCollapsed
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                        : 'border border-purple-200/80 bg-purple-50 text-purple-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-sm'
+                  }`}
+                >
+                  {active && !isCollapsed && (
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 rounded-r-full bg-purple-600 shrink-0" />
+                  )}
+                  <Icon
+                    className={`h-[18px] w-[18px] shrink-0 transition-colors ${
+                      active
+                        ? isCollapsed
+                          ? 'text-white'
+                          : 'text-purple-600'
+                        : 'text-gray-400 group-hover:text-gray-700'
+                    }`}
+                  />
+                  {isCollapsed ? null : <span className="flex-1 truncate whitespace-nowrap overflow-x-hidden">{taxonomyItem.label}</span>}
+                </Link>
+
+                {/* Collapsed Hover Tooltip */}
+                {isCollapsed && (
+                  <div className="absolute left-full ml-3 hidden group-hover:flex items-center px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-md shadow-lg whitespace-nowrap z-50 pointer-events-none transition-all duration-150 ease-in-out top-1/2 -translate-y-1/2">
+                    {taxonomyItem.label}
+                    <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-2 h-2 bg-slate-900 rotate-45" />
+                  </div>
+                )}
+              </li>
+            );
+          })()}
         </ul>
       </nav>
 

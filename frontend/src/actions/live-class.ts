@@ -52,13 +52,14 @@ export async function createLiveClass(payload: CreateLiveClassPayload) {
         status: 'SCHEDULED',
       })
       .select('*')
-      .single()
-      .returns<LiveClass>();
+      .single();
 
     if (error) {
       console.error('createLiveClass error:', error);
       return { success: false, error: error.message };
     }
+
+    const liveClassData = data as unknown as LiveClass;
 
     // Teacher-owned Meet generation: warn when the assigned teacher hasn't
     // connected their Google account, so the admin can fix it before the
@@ -81,7 +82,7 @@ export async function createLiveClass(payload: CreateLiveClassPayload) {
     }
 
     revalidatePath('/admin/live-classes');
-    return warning ? { success: true, data, warning } : { success: true, data };
+    return warning ? { success: true, data: liveClassData, warning } : { success: true, data: liveClassData };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to create live class';
     console.error('createLiveClass exception:', err);
@@ -122,6 +123,61 @@ export async function deleteLiveClass(id: string) {
 /**
  * Fetches every live class, ordered by start time ascending.
  */
+export async function getLiveClassById(id: string) {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('live_classes')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      return { success: false, error: error.message, data: null };
+    }
+    return { success: true, data: data as unknown as LiveClass | null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch live class';
+    return { success: false, error: message, data: null };
+  }
+}
+
+export async function updateLiveClass(id: string, payload: Partial<CreateLiveClassPayload> & { status?: LiveClass['status'] }) {
+  try {
+    const supabase = await createClient();
+
+    const updateData: Record<string, unknown> = {};
+    if (payload.course_id !== undefined) updateData.course_id = payload.course_id;
+    if (payload.title !== undefined) updateData.title = payload.title.trim();
+    if (payload.description !== undefined) updateData.description = payload.description.trim() || null;
+    if (payload.teacher_id !== undefined) updateData.teacher_id = payload.teacher_id;
+    if (payload.student_ids !== undefined) updateData.student_ids = payload.student_ids;
+    if (payload.start_time !== undefined) updateData.start_time = toOffsetAwareISO(payload.start_time);
+    if (payload.end_time !== undefined) updateData.end_time = toOffsetAwareISO(payload.end_time);
+    if (payload.recurrence !== undefined) updateData.recurrence = payload.recurrence;
+    if (payload.recurrence_days !== undefined) updateData.recurrence_days = payload.recurrence_days;
+    if (payload.status !== undefined) updateData.status = payload.status;
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from('live_classes')
+      .update(updateData)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/admin/live-classes');
+    return { success: true, data };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to update live class';
+    return { success: false, error: message };
+  }
+}
+
 export async function getAdminLiveClasses() {
   try {
     const supabase = await createClient();
@@ -144,3 +200,48 @@ export async function getAdminLiveClasses() {
     return { success: false, error: message, data: [] };
   }
 }
+
+export async function duplicateLiveClass(id: string) {
+  try {
+    const supabase = await createClient();
+    const { data: rawOriginal, error: fetchErr } = await supabase
+      .from('live_classes')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    const original = rawOriginal as unknown as LiveClass | null;
+
+    if (fetchErr || !original) {
+      return { success: false, error: fetchErr?.message || 'Original class not found' };
+    }
+
+    const { data, error } = await supabase
+      .from('live_classes')
+      .insert({
+        course_id: original.course_id,
+        title: `${original.title} (Copy)`,
+        description: original.description,
+        teacher_id: original.teacher_id,
+        student_ids: original.student_ids,
+        start_time: original.start_time,
+        end_time: original.end_time,
+        recurrence: original.recurrence,
+        recurrence_days: original.recurrence_days,
+        status: 'SCHEDULED',
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/admin/live-classes');
+    return { success: true, data };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to duplicate live class';
+    return { success: false, error: message };
+  }
+}
+
