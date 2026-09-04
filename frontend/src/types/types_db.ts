@@ -34,6 +34,7 @@ export interface Database {
           education_board: string | null;
           class_grade: string | null;
           avatar_url: string | null;
+          google_refresh_token: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -51,6 +52,7 @@ export interface Database {
           education_board?: string | null;
           class_grade?: string | null;
           avatar_url?: string | null;
+          google_refresh_token?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -68,6 +70,7 @@ export interface Database {
           education_board?: string | null;
           class_grade?: string | null;
           avatar_url?: string | null;
+          google_refresh_token?: string | null;
           created_at?: string;
           updated_at?: string;
         };
