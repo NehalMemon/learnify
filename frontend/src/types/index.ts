@@ -27,6 +27,8 @@ export interface User {
   educationBoard?: string | null;
   classGrade?: string | null;
   avatarUrl?: string | null;
+  google_refresh_token?: string | null;
+  googleRefreshToken?: string | null;
   accessExpiresAt?: string | Date | null;
   createdAt: string;
   updatedAt: string;

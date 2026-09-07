@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function InstructorIndexPage() {
-  redirect('/admin/dashboard');
+  redirect('/instructor/settings');
 }
